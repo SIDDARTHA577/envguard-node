@@ -1,253 +1,248 @@
 # EnvGuard (`envguard-node`)
 
-> Production-ready, zero-secrets-leakage environment variable validation library and CLI for Node.js and TypeScript.
+[![CI](https://github.com/SIDDARTHA577/envguard-node/actions/workflows/ci.yml/badge.svg)](https://github.com/SIDDARTHA577/envguard-node/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/SIDDARTHA577/envguard-node/actions/workflows/codeql.yml/badge.svg)](https://github.com/SIDDARTHA577/envguard-node/actions/workflows/codeql.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![Node.js: 18 | 20 | 22](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)](https://nodejs.org/)
+
+> **Secure, dependency-free environment configuration validation for Node.js, CI/CD, and AI-assisted development.**
 
 ---
 
-## 1. The Problem EnvGuard Solves
+## 1. Value Proposition
 
-Missing or misconfigured environment variables are among the most common causes of production outages, deployment failures, and security mishaps in Node.js applications:
+Configuration errors and missing environment variables cause broken deployments, startup crashes, and serious credential leaks:
 
-- Applications crash halfway through startup when a forgotten variable is accessed deep inside a controller or service.
-- Standard assertion libraries or manual checks often echo raw values into logs, exceptions, or terminal displays during errors, inadvertently exposing database credentials, API keys, and auth secrets.
-- Inconsistent types: environment variables are always strings in `process.env`, leading to bugs when evaluating ports, booleans (e.g. `"false"` being truthy in JavaScript), or URLs.
+- **Missing variables** cause applications to fail deep into request handling when a database query or payment gateway is first invoked.
+- **Leaky diagnostic errors**: Standard assertion and validation tools often print evaluated values upon failure (`Expected port number, received "postgres://user:super_secret_password@db..."`), leaking sensitive credentials into terminal logs, Datadog/Sentry error trackers, or CI stdout.
+- **Untyped strings**: Everything in `process.env` is a string, creating subtle bugs when evaluating ports (`"3000"`), booleans (`"false"` is truthy in JavaScript), or URLs.
 
-**EnvGuard** provides type-safe, declarative environment validation with an ironclad architectural guarantee: **no environment value is ever rendered in error messages, stack traces, terminal reports, or machine-readable JSON outputs.**
-
----
-
-## 2. Who Should Use It
-
-- **Backend Engineers & Teams**: Catch missing credentials and invalid configurations immediately during boot before initializing servers or database connection pools.
-- **DevOps & Platform Engineers**: Validate `.env` files and runtime configurations inside CI/CD pipelines (GitHub Actions, GitLab CI, Docker entrypoints) with deterministic exit codes.
-- **Open-Source Maintainers**: Ensure sample `.env.example` configurations remain synchronized with application requirements.
+**EnvGuard** provides type-safe schema validation with an ironclad security guarantee: **no environment value is ever rendered in errors, terminal diagnostics, stack traces, or JSON outputs.**
 
 ---
 
-## 3. Installation
+## 2. Before and After EnvGuard
 
-Install as a dependency using your preferred package manager:
+### Without EnvGuard (Ad-Hoc / Risky)
+```javascript
+// Unchecked types and potential credential leakage in error logs
+const port = parseInt(process.env.PORT, 10); // NaN if missing
+if (!process.env.DATABASE_URL) {
+  // If logged, custom errors often echo process.env or sensitive variables!
+  throw new Error(`Database URL is invalid: ${process.env.DATABASE_URL}`);
+}
+const isProduction = Boolean(process.env.IS_PROD); // "false" becomes true!
+```
+
+### With EnvGuard (Type-Safe & Leak-Proof)
+```typescript
+import { guard, s } from 'envguard-node';
+
+const config = guard({
+  PORT: s.port().default(3000),
+  DATABASE_URL: s.url({ protocols: ['postgres:', 'postgresql:'] }).sensitive(),
+  IS_PROD: s.boolean().default(false),
+}, undefined, { throwOnError: true }).data;
+
+// config is strictly typed:
+// config.PORT -> number
+// config.DATABASE_URL -> string
+// config.IS_PROD -> boolean
+```
+
+---
+
+## 3. Supported Node.js Versions
+
+Tested continuously on active Node.js LTS releases across **Linux (Ubuntu)** and **Windows**:
+- Node.js `22.x`
+- Node.js `20.x` (LTS)
+- Node.js `18.x`
+
+Zero runtime dependencies. Pure Node.js standard libraries only (`node:fs`, `node:path`, `node:url`).
+
+---
+
+## 4. Installation
+
+Install via your preferred package manager:
 
 ```bash
 # npm
 npm install envguard-node
 
-# yarn
-yarn add envguard-node
-
 # pnpm
 pnpm add envguard-node
+
+# yarn
+yarn add envguard-node
 ```
 
-If using the CLI in local scripts or CI:
-
+For project-local CLI usage in scripts and CI:
 ```bash
-npm install --save-dev envguard-node
+npm install -D envguard-node
 ```
 
 ---
 
-## 4. Quick-Start Example
+## 5. Quickstart (30 Seconds)
 
-```typescript
-import { guard, s } from 'envguard-node';
-
-// Define configuration shape
-const schema = {
-  NODE_ENV: s.enum(['development', 'production', 'test']).default('development'),
-  PORT: s.port().default(3000),
-  DATABASE_URL: s.url({ protocols: ['postgres:', 'postgresql:'] })
-    .sensitive()
-    .describe('PostgreSQL database connection URL'),
-  API_SECRET: s.string({ min: 16 })
-    .sensitive()
-    .describe('Third-party API key'),
-};
-
-// Validate against process.env
-const result = guard(schema);
-
-if (!result.success) {
-  console.error('Configuration validation failed:');
-  for (const err of result.errors) {
-    // Variable name and issue type are reported, never the underlying secret value
-    console.error(` - [${err.issue.toUpperCase()}] ${err.key}: ${err.message}`);
-  }
-  process.exit(1);
-}
-
-// result.data is strictly typed with coerced values
-const { PORT, DATABASE_URL, NODE_ENV } = result.data;
-console.log(`Starting server on port ${PORT} in ${NODE_ENV} mode...`);
-```
-
----
-
-## 5. CLI Usage
-
-EnvGuard includes a standalone command-line interface:
-
+### Step 1: Initialize Configuration
 ```bash
-# Run validation against auto-detected config (envguard.config.json or .js)
-npx envguard check
-
-# Validate against an explicit schema file
-npx envguard check --schema ./envguard.config.json
-
-# Validate against a specific .env file
-npx envguard check --env-file .env.production
-
-# Produce machine-readable JSON output for automated CI scripts
-npx envguard check --format json
-
-# Strict mode: fail if unexpected variables exist in the environment
-npx envguard check --strict
-
-# Initialize a starter configuration and safe .env.example
 npx envguard init
 ```
+This safely creates a starter `envguard.config.json` and a clean `.env.example` without overwriting existing files.
 
----
+### Step 2: Validate Environment
+```bash
+# Run validation against your environment
+npx envguard check
 
-## 6. Library Usage
-
-### Programmatic API
-
-```typescript
-import { guard, s, EnvGuardValidationError } from 'envguard-node';
-
-const appSchema = {
-  PORT: s.port().default(8080),
-  CACHE_TTL: s.number().default(3600),
-  DEBUG_MODE: s.boolean().default(false),
-};
-
-// 1. Explicit environment object (deterministic, ideal for unit testing)
-const testEnv = { PORT: '9000', CACHE_TTL: '60', DEBUG_MODE: 'true' };
-const testResult = guard(appSchema, testEnv);
-// testResult.data -> { PORT: 9000, CACHE_TTL: 60, DEBUG_MODE: true }
-
-// 2. Throwing on validation failure
-try {
-  const result = guard(appSchema, process.env, { throwOnError: true });
-} catch (error) {
-  if (error instanceof EnvGuardValidationError) {
-    console.error(error.message); // Safe summary without leaking values
-  }
-}
+# Or test against a specific environment file
+npx envguard check --env-file .env.example
 ```
 
 ---
 
-## 7. Schema Options & Validators
+## 6. Programmatic API Reference
 
-| Validator | Description | Example / Options |
+EnvGuard supports both **ESM (`import`)** and **CommonJS (`require`)**:
+
+```typescript
+// ESM
+import { guard, s, defineSchema } from 'envguard-node';
+
+// CommonJS
+const { guard, s, defineSchema } = require('envguard-node');
+```
+
+### Validators & Modifiers
+
+| Validator | Options / Description | Example |
 |---|---|---|
-| `s.string(options?)` | String validation | `s.string({ min: 8, max: 64, pattern: /^[A-Z0-9]+$/ })` |
-| `s.number(options?)` | Numeric coercion (integers & floats) | `s.number({ min: 0, max: 100 })` |
-| `s.integer(options?)` | Whole numbers only | `s.integer({ min: 1 })` |
-| `s.port(options?)` | Network port (1–65535) | `s.port().default(3000)` |
-| `s.boolean(options?)` | Coerces `"true"`, `"false"`, `"1"`, `"0"`, `"yes"`, `"no"` | `s.boolean().default(false)` |
-| `s.url(options?)` | WHATWG URL validation | `s.url({ protocols: ['https:'] })` |
-| `s.enum(allowedValues)` | Union string validation | `s.enum(['dev', 'prod'] as const)` |
+| `s.string(opts?)` | Strings; `min`, `max`, `pattern`, `choices`, `trim` | `s.string({ min: 16 }).trim()` |
+| `s.number(opts?)` | Coerces floats and integers; `min`, `max` | `s.number({ min: 0 })` |
+| `s.integer(opts?)` | Whole numbers only | `s.integer().default(100)` |
+| `s.port(opts?)` | Network ports `1` through `65535` | `s.port().default(8080)` |
+| `s.boolean(opts?)` | Coerces `"true"`, `"false"`, `"1"`, `"0"`, `"yes"`, `"no"` | `s.boolean().default(false)` |
+| `s.url(opts?)` | WHATWG absolute URLs with protocol check | `s.url({ protocols: ['https:'] })` |
+| `s.enum(values)` | Union of allowed string values | `s.enum(['dev', 'prod'] as const)` |
 
 ### Modifiers
-- `.optional()`: Allows variable to be omitted (`T | undefined`).
-- `.default(value)`: Supplies a fallback value when variable is missing or empty.
-- `.sensitive()`: Marks field as sensitive secret.
-- `.describe(description)`: Adds documentation metadata.
-- `.custom(fn, description?)`: Pure sync validation logic `(val: T) => boolean | string`.
+- `.optional()`: Marks variable as optional (`T | undefined`).
+- `.default(val)`: Supplies a fallback value when the variable is missing or empty string (`""`).
+- `.sensitive()`: Marks field as sensitive secret for documentation.
+- `.describe(text)`: Attaches documentation metadata.
+- `.custom(fn, desc?)`: Pure custom validation `(val: T) => boolean | string`.
 
 ---
 
-## 8. Validation Errors
+## 7. CLI Reference & Exit Codes
 
-Validation failures return structured error items containing:
+```bash
+# Check current environment
+envguard check
 
-- `key`: The variable name (e.g., `DATABASE_URL`).
-- `type`: Expected validator type.
-- `issue`: One of `missing`, `invalid_type`, `out_of_range`, `invalid_format`, `custom_check_failed`, or `unexpected_variable`.
-- `message`: Human-readable description of the constraint that failed.
-- `expected`: Description of acceptable range or pattern.
+# Check with an explicit schema file
+envguard check --schema ./envguard.config.json
 
-**Guaranteed Value Protection**: The actual environment value is **never** attached to the error item, preventing accidental exposure when serializing or printing error lists.
+# Check against a specified .env file
+envguard check --env-file .env.production
 
----
+# Produce versioned, machine-readable JSON for automated scripts
+envguard check --format json
 
-## 9. Exit Codes
+# Strict mode: fail if unexpected variables exist in the environment
+envguard check --strict
 
-When running in CLI environments or CI/CD pipelines:
+# Initialize starter configuration and safe .env.example
+envguard init [--type json|js] [--force]
+```
 
-| Code | Status | Meaning |
+### Deterministic Exit Codes
+
+| Exit Code | Status | Meaning |
 |---|---|---|
-| `0` | Success | All environment variables passed validation. |
-| `1` | Validation Failed | One or more variables were missing, unparseable, or out of range. |
+| `0` | Success | All environment variables matched the schema. |
+| `1` | Validation Failed | One or more variables were missing or invalid. CI step fails. |
 | `2` | Configuration Error | Schema file not found, bad syntax, or invalid CLI flag. |
 
 ---
 
-## 10. Security & Limitations
+## 8. Real-World Integration Examples
 
-### Security Principles
-- **No Telemetry / No Network Calls**: Runs strictly offline using Node.js standard libraries.
-- **Safe Dotenv Parser**: No `eval`, no command execution, and no shell child processes.
-- **Redaction by Architecture**: Evaluated values are discarded from error outputs rather than masked after the fact.
+Complete, runnable examples are provided in the [`examples/`](./examples/) directory:
 
-### Limitations
-- EnvGuard validates the **format, type, and shape** of environment configuration; it does not connect to external servers to verify whether credentials are authentication-valid.
-- Nested object schemas are supported via declarative JSON configurations or custom functions.
-
----
-
-## 11. Contributing Instructions
-
-Contributions are welcome! Please review our [Contributing Guide](./CONTRIBUTING.md) and [Code of Conduct](./CODE_OF_CONDUCT.md).
-
-1. Fork and clone the repository.
-2. Install dependencies: `npm install`.
-3. Verify tests: `npm test`.
-4. Ensure no secrets are present in new tests or documentation.
-5. Submit a pull request against `main`.
+- [`examples/basic-app/`](./examples/basic-app/): Minimal Node.js application startup.
+- [`examples/express-app/`](./examples/express-app/): HTTP server pre-flight validation preventing broken sockets.
+- [`examples/docker-app/`](./examples/docker-app/): Multi-stage container entrypoint validation with `.dockerignore`.
+- [`examples/multi-env/`](./examples/multi-env/): Composable schemas with strict production overrides.
+- [`examples/cli-workflow/`](./examples/cli-workflow/): Automated CI validation pipeline.
 
 ---
 
-## 12. How to Report Vulnerabilities
+## 9. AI Coding Agent Skills
 
-If you discover a security issue or potential information leak:
+EnvGuard provides installable skills for AI coding agents (**Google Antigravity**, **Claude Code**, and **OpenAI Codex**):
 
-- **Do not open a public GitHub issue.**
-- Submit an advisory via [GitHub Private Vulnerability Reporting](https://github.com/SIDDARTHA577/envguard-node/security/advisories/new) or email `190904900+SIDDARTHA577@users.noreply.github.com`.
-- See [SECURITY.md](./SECURITY.md) for full policy details.
+| Skill | Purpose |
+|---|---|
+| `envguard-audit` | Scans codebase for `process.env` references and proposes a safe schema without reading secrets. |
+| `envguard-setup` | Automates EnvGuard installation and entrypoint integration tailored to the project's package manager. |
+| `envguard-review` | Inspects environment handling for common security vulnerabilities and unmasked error logging. |
+| `envguard-ci` | Integrates validation into GitHub Actions or Docker entrypoints. |
+| `envguard-migrate` | Migrates legacy ad-hoc `process.env` reads to EnvGuard step-by-step with zero regressions. |
+
+See [`docs/agent-installation.md`](./docs/agent-installation.md) for installation and usage instructions across each host.
 
 ---
 
-## 13. Development and Testing Instructions
+## 10. Security Model & Privacy
+
+- **Zero Outbound Network Traffic**: EnvGuard runs 100% locally. It contains no telemetry, analytics, or background tracking.
+- **Architectural Value Redaction**: Evaluated environment values are discarded rather than masked with asterisks after the fact. Errors contain only the variable name and the failed constraint.
+- **Safe Dotenv Parser**: Built-in state machine parser. Does NOT execute arbitrary shell commands, backticks, or subshells.
+- **Prototype Pollution Protection**: Rejects `__proto__`, `constructor`, and `prototype` keys during schema ingestion.
+- **Limitations**: EnvGuard validates the *shape, type, and format* of configuration; it does not connect to external third-party services to verify whether API keys are active.
+
+---
+
+## 11. Security Vulnerability Reporting
+
+Please report security vulnerabilities privately:
+- Submit an advisory via [GitHub Private Vulnerability Reporting](https://github.com/SIDDARTHA577/envguard-node/security/advisories/new).
+- Or email `190904900+SIDDARTHA577@users.noreply.github.com`.
+- Full disclosure policy: [SECURITY.md](./SECURITY.md).
+
+---
+
+## 12. Contributing
+
+We welcome community pull requests and bug reports! See [CONTRIBUTING.md](./CONTRIBUTING.md) and [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md).
 
 ```bash
-# Clone the project
+# Clone and install dependencies
 git clone https://github.com/SIDDARTHA577/envguard-node.git
 cd envguard-node
-
-# Install dev dependencies
 npm install
 
-# Run Vitest test suite
-npm test
-
-# Run TypeScript type checking
+# Run checks
 npm run typecheck
-
-# Run ESLint
 npm run lint
-
-# Compile production bundle
-npm run build
+npm test
+npm run test:pack
 ```
 
 ---
 
-## 14. Current Project Status
+## 13. Roadmap & Adoption
 
-- **Version**: `1.0.0`
-- **Maintenance**: Actively maintained by `SIDDARTHA577`.
-- **Ecosystem Status**: Initial public release. Feedback, issues, and PRs are welcomed from the community.
+- [Product Roadmap](./docs/roadmap.md): Planned framework adapters and features.
+- [Adoption & Metrics Guide](./docs/adoption-guide.md): Guide to measuring verified open-source metrics.
+- [Engineering Audit](./docs/engineering-audit.md): Complete technical baseline and architecture decisions.
+
+---
+
+## 14. License
+
+[MIT License](./LICENSE) © 2026 SIDDARTHA577.

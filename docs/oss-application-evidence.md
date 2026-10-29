@@ -60,3 +60,4 @@ To build genuine open-source qualification evidence over time without artificial
 - [ ] Welcome first external issue reports and community pull requests.
 - [ ] Track organic npm download figures and dependent GitHub repositories via npm / libraries.io.
 - [ ] Revisit Claude for Open Source application once adoption thresholds (or maintainer contribution benchmarks) are demonstrably verified.
+

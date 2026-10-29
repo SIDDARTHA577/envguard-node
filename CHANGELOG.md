@@ -8,14 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.0.0] - 2026-10-29
 
 ### Added
-- Core schema definition engine (`string`, `number`, `integer`, `boolean`, `url`, `port`, `enum`, `custom`).
-- Type coercion and default value handling with documented precedence.
-- Zero secret exposure architecture: variable values are never rendered in error messages, terminal diagnostics, or machine-readable JSON outputs.
-- Programmatic API `guard(schema, env?, options?)` with full TypeScript inference.
-- CLI binary `envguard` with `check` and `init` commands.
-- Support for `terminal` and `json` output formatting.
-- Safe `.env` file parser with zero unsafe `eval` execution.
-- Cross-platform support for Windows, Linux, and macOS.
-- GitHub Actions workflows for continuous integration (matrix testing on Node 18, 20, 22), linting, build verification, and automated vulnerability auditing.
-- Extensive test suite covering validators, CLI argument handling, exit codes, edge cases, and secret redaction guarantees.
-- Comprehensive documentation: README, SECURITY, CONTRIBUTING, CODE OF CONDUCT, and open source application evidence.
+- **Core Schema Engine**: Built-in validators for `string`, `number`, `integer`, `boolean`, `url`, `port`, `enum`, and safe `custom` functions.
+- **Zero-Secret-Leakage Architecture**: Variable values are strictly discarded from error objects, terminal reports, exception messages, and JSON reports.
+- **Dual ESM & CommonJS Build**: Seamless out-of-the-box support for both ESM (`import`) and CommonJS (`require`).
+- **Hardened .env Parser**: Strip UTF-8 BOM, enforce 5MB max size limit, support multi-line strings, escape sequences, duplicate key detection, and prototype-pollution rejection.
+- **Prototype-Pollution Protection**: Defense-in-depth rejection of `__proto__`, `constructor`, and `prototype` keys during schema ingestion and JSON loading.
+- **CLI Commands**: `envguard check` (with `--schema`, `--env-file`, `--format json`, `--strict`) and safe `envguard init` with deterministic exit codes (`0`, `1`, `2`).
+- **AI Coding Agent Skills**: Original skills (`envguard-audit`, `envguard-setup`, `envguard-review`, `envguard-ci`, `envguard-migrate`) with Antigravity, Claude Code, and Codex manifests.
+- **Supply-Chain & Security Hardening**: Pinned GitHub Actions commit SHAs, CodeQL security analysis, Dependabot weekly updates, issue/PR templates, `.editorconfig`, and `.gitattributes`.
+- **Comprehensive Test Suite**: 61 automated tests covering validators, CLI argument handling, exit codes, hostile input, secret redaction, and manifest drift prevention.
+- **Real-World Examples**: Fully runnable examples for standard apps, Express servers, Docker containers with pre-flight checks, and multi-environment configurations.
+- **Documentation**: Exhaustive README, API reference, CLI reference, Architecture guide, Roadmap, Adoption guide, and Engineering audit.

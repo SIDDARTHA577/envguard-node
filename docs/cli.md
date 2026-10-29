@@ -72,3 +72,4 @@ In GitHub Actions, GitLab CI, or Docker entrypoints, run `envguard check` before
 - name: Validate Production Configuration
   run: npx envguard check --schema envguard.config.json --env-file .env.production
 ```
+
