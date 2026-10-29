@@ -43,3 +43,4 @@ If you discover a security vulnerability or potential data leak in `EnvGuard`, p
    - Reproduction steps or minimal code example (ensuring any sample keys are purely fictional, e.g., `sk_test_placeholder`).
    - The potential impact.
 4. You will receive an acknowledgment within 48 hours, followed by updates on triage and mitigation.
+
