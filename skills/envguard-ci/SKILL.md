@@ -47,3 +47,4 @@ In Dockerfiles, run the validation check before executing the server binary:
 ```dockerfile
 CMD ["sh", "-c", "npx envguard check --schema envguard.config.json && node dist/index.js"]
 ```
+

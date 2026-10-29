@@ -97,3 +97,4 @@
 
 - Remote npm registry token or automated publication (strictly preserved as manual boundary requiring explicit approval).
 - Third-party cloud secret manager integrations (explicitly out of scope: EnvGuard operates 100% locally).
+

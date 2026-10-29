@@ -38,3 +38,4 @@ Categorize all findings into:
 1. **Critical Vulnerabilities**: e.g. committed `.env` files with real keys, unmasked console logging of secrets.
 2. **Missing Hardening**: e.g. optional variables lacking defaults, unconstrained port numbers.
 3. **Recommended Improvements**: e.g. adding `.dockerignore`, adding protocol validation to connection strings.
+

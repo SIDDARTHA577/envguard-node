@@ -53,3 +53,4 @@ export default defineSchema({
   STRIPE_SECRET_KEY: s.string({ min: 24 }).sensitive().describe('Payment provider API key'),
 });
 ```
+

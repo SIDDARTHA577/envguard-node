@@ -13,9 +13,10 @@ Only the latest major version receives security updates and vulnerability patche
 
 ## Core Security Commitments
 
-1. **Zero Secret Exposure**:
-   - `EnvGuard` is architecturally designed so that actual secret values are **never** rendered into validation errors, exception messages, terminal output, stack traces, or serialized JSON reports.
-   - Error messages state the name of the failing variable and the constraint violated (e.g., missing, invalid port number, invalid URL format), without echoing the received value.
+1. **Built-In Diagnostic Redaction**:
+   - `EnvGuard` is architecturally designed so that evaluated secret values are omitted from built-in validation errors, exception messages, terminal output, stack traces, and serialized JSON reports.
+   - Error messages report the name of the failing variable and the constraint violated (e.g., missing, invalid port number, invalid URL format), without echoing the received value.
+   - *Limitation*: EnvGuard cannot prevent data leaks if user application code or custom validator functions independently print, log, or transmit sensitive values.
 
 2. **No Telemetry / No Network Requests**:
    - `EnvGuard` runs 100% locally.

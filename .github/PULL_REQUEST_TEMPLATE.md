@@ -12,7 +12,7 @@ A clear, concise summary of the motivation, changes, and user-facing impact.
 
 ## Security & Privacy Verification
 
-- [ ] **Zero Secrets Leakage**: Confirmed no raw secret values appear in test outputs, error strings, snapshots, or logs.
+- [ ] **Value Redaction in Built-In Output**: Confirmed no raw secret values appear in test outputs, error strings, snapshots, or logs.
 - [ ] **No Secrets in Commits**: Verified that no real tokens, credentials, or private `.env` files are in this pull request.
 - [ ] **No Telemetry / Offline Execution**: Preserved 100% offline, local standard library execution.
 
@@ -23,3 +23,4 @@ A clear, concise summary of the motivation, changes, and user-facing impact.
 - [ ] `npm test` passes all tests.
 - [ ] `npm run test:pack` passes consumer installation and smoke checks.
 - [ ] Added regression unit/integration tests covering new or modified behavior.
+

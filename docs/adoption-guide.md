@@ -47,3 +47,4 @@ When citing project adoption in grants, applications, or public presentations:
 1. **State the Exact Timeframe**: Always anchor download metrics to a specific date range (e.g., "15,000 monthly downloads measured via npm registry API as of October 2026").
 2. **Exclude Automated CI Traffic Where Feasible**: Be aware that automated CI matrix tests generate download counts; distinguish high-volume robot downloads from unique developer installations.
 3. **Distinguish Baseline from Milestones**: Clearly state when a package is newly released (version 1.0.0) versus an established library with verified production dependents.
+

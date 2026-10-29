@@ -43,3 +43,4 @@ Use this skill when installing and configuring EnvGuard in a project for the fir
   // Fail fast before establishing server or database connections
   const config = guard(configSchema, undefined, { throwOnError: true }).data;
   ```
+

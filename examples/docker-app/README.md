@@ -28,3 +28,4 @@ docker run --rm \
   -e APP_SECRET=secret_key_minimum_32_chars_length_ok \
   envguard-docker-example
 ```
+

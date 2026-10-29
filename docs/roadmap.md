@@ -6,7 +6,7 @@ This roadmap reflects genuine engineering priorities and planned capabilities ba
 
 ## Now (v1.0.0 Baseline) :white_check_mark:
 
-- [x] **Zero-Secrets-Leakage Validation Engine**: Architecturally guaranteed redaction of raw configuration values across all errors, diagnostics, and JSON reports.
+- [x] **Redacted Diagnostic Validation Engine**: Built-in error reporting and JSON diagnostics architected to omit raw environment values.
 - [x] **Zero Runtime Dependencies**: Strict dependency on Node.js standard libraries (`node:fs`, `node:path`, `node:url`) to eliminate supply-chain risk.
 - [x] **Dual ESM & CommonJS Compilation**: Synchronous out-of-the-box support for both modern ESM `import` and legacy CommonJS `require()`.
 - [x] **Standalone Safe CLI**: `envguard check` and `envguard init` with deterministic exit codes (`0`, `1`, `2`) and machine-readable JSON output.
@@ -30,3 +30,4 @@ This roadmap reflects genuine engineering priorities and planned capabilities ba
 - [ ] **Deep Nested Object Validation**: Declarative validation for complex nested JSON structures in microservice configuration maps.
 - [ ] **Additional AI Agent Host Adaptations**: Support for newly emerging agent skill standards as they achieve official multi-vendor adoption.
 - [ ] **Automated Attestation & SLSA Provenance**: Publish npm packages with Sigstore build provenance attestations via GitHub Actions.
+

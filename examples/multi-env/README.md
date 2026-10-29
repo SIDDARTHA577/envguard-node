@@ -34,3 +34,4 @@ export const productionSchema = defineSchema({
 const schema = process.env.NODE_ENV === 'production' ? productionSchema : developmentSchema;
 export const config = guard(schema).data;
 ```
+

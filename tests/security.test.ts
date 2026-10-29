@@ -66,6 +66,12 @@ describe('Security and Secret Redaction Guarantees', () => {
     expect(exceptionString).not.toContain(SENSITIVE_PASSWORD);
     expect(exceptionString).not.toContain(SENSITIVE_CONNECTION_STRING);
     expect(exceptionString).not.toContain('invalid_env_mode_secret_xyz');
+
+    const stackString = String(caughtError?.stack);
+    expect(stackString).not.toContain(SENSITIVE_TOKEN);
+    expect(stackString).not.toContain(SENSITIVE_PASSWORD);
+    expect(stackString).not.toContain(SENSITIVE_CONNECTION_STRING);
+    expect(stackString).not.toContain('invalid_env_mode_secret_xyz');
   });
 
   it('does not leak secrets when custom validator throws or returns false', () => {

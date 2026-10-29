@@ -23,3 +23,4 @@ EnvGuard catches configuration errors **at process startup** before the HTTP ser
    ```
 
 3. Try introducing an invalid port or omitting `DATABASE_URL` in `.env` to observe safe fail-fast behavior.
+
