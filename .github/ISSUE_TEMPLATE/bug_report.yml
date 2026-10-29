@@ -37,10 +37,10 @@ body:
     attributes:
       label: Node.js Version
       options:
-        - "Node.js 22.x"
-        - "Node.js 20.x (LTS)"
-        - "Node.js 18.x"
-        - "Other (specify below)"
+        - "Node.js 24.x"
+        - "Node.js 22.x (Active LTS)"
+        - "Node.js 20.x (Maintenance LTS)"
+        - "Other / EOL version (Node.js 18 or older)"
     validations:
       required: true
   - type: dropdown
@@ -53,3 +53,4 @@ body:
         - "Windows"
     validations:
       required: true
+
