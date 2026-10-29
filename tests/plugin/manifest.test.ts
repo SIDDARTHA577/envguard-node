@@ -11,12 +11,14 @@ describe('EnvGuard Agent Skills Plugin & Manifest Consistency', () => {
 
   const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
 
-  it('validates canonical plugin.json manifest structure', () => {
+  it('validates canonical Antigravity plugin.json manifest structure', () => {
     expect(fs.existsSync(canonicalPluginPath)).toBe(true);
     const manifest = JSON.parse(fs.readFileSync(canonicalPluginPath, 'utf8'));
 
     expect(manifest.name).toBe('envguard');
     expect(manifest.version).toBe(packageJson.version);
+    expect(Array.isArray(manifest.suggestedPrompts)).toBe(true);
+    expect(manifest.suggestedPrompts.length).toBeGreaterThan(0);
     expect(manifest.skills).toHaveLength(5);
 
     for (const skillDir of manifest.skills) {
@@ -76,6 +78,26 @@ describe('EnvGuard Agent Skills Plugin & Manifest Consistency', () => {
       const frontmatter = content.slice(3, secondDashes);
       expect(frontmatter).toContain(`name: ${folder}`);
       expect(frontmatter).toContain('description:');
+    }
+  });
+
+  it('verifies that .agents/skills/ is byte-synchronized with canonical skills/', () => {
+    const canonicalDir = path.join(rootDir, 'skills');
+    const codexSkillsDir = path.join(rootDir, '.agents', 'skills');
+
+    expect(fs.existsSync(codexSkillsDir)).toBe(true);
+    const canonicalFolders = fs.readdirSync(canonicalDir);
+
+    for (const folder of canonicalFolders) {
+      const canonicalFile = path.join(canonicalDir, folder, 'SKILL.md');
+      const codexFile = path.join(codexSkillsDir, folder, 'SKILL.md');
+
+      expect(fs.existsSync(codexFile)).toBe(true);
+
+      const canonicalContent = fs.readFileSync(canonicalFile, 'utf8');
+      const codexContent = fs.readFileSync(codexFile, 'utf8');
+
+      expect(codexContent).toBe(canonicalContent);
     }
   });
 });

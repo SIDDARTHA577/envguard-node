@@ -7,27 +7,27 @@
   "skills": [
     {
       "name": "envguard-audit",
-      "path": "./skills/envguard-audit/SKILL.md",
+      "path": "./.agents/skills/envguard-audit/SKILL.md",
       "description": "Audit repository environment variable usage and recommend a safe schema"
     },
     {
       "name": "envguard-setup",
-      "path": "./skills/envguard-setup/SKILL.md",
+      "path": "./.agents/skills/envguard-setup/SKILL.md",
       "description": "Install and configure EnvGuard in a Node.js project"
     },
     {
       "name": "envguard-review",
-      "path": "./skills/envguard-review/SKILL.md",
+      "path": "./.agents/skills/envguard-review/SKILL.md",
       "description": "Review environment variable and secret handling for security risks"
     },
     {
       "name": "envguard-ci",
-      "path": "./skills/envguard-ci/SKILL.md",
+      "path": "./.agents/skills/envguard-ci/SKILL.md",
       "description": "Integrate EnvGuard into automated CI/CD pipelines"
     },
     {
       "name": "envguard-migrate",
-      "path": "./skills/envguard-migrate/SKILL.md",
+      "path": "./.agents/skills/envguard-migrate/SKILL.md",
       "description": "Safely migrate codebase from raw process.env to EnvGuard"
     }
   ]

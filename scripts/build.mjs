@@ -2,7 +2,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execSync } from 'node:child_process';
 
+import { syncCodexSkills } from './sync-codex-skills.mjs';
+
 const distDir = path.resolve('dist');
+
+// Synchronize skills to .agents/skills for Codex discovery
+syncCodexSkills();
 
 // 1. Ensure dist/cli.js starts with shebang
 const cliPath = path.join(distDir, 'cli-bin.js');

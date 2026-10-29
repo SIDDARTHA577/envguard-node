@@ -6,13 +6,14 @@
     "name": "SIDDARTHA577",
     "url": "https://github.com/SIDDARTHA577"
   },
+  "homepage": "https://github.com/SIDDARTHA577/envguard-node",
   "repository": "https://github.com/SIDDARTHA577/envguard-node",
   "license": "MIT",
   "skills": [
-    "skills/envguard-audit",
-    "skills/envguard-setup",
-    "skills/envguard-review",
-    "skills/envguard-ci",
-    "skills/envguard-migrate"
+    "./skills/envguard-audit",
+    "./skills/envguard-setup",
+    "./skills/envguard-review",
+    "./skills/envguard-ci",
+    "./skills/envguard-migrate"
   ]
 }
