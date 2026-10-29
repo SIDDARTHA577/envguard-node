@@ -1,0 +1,63 @@
+{
+  "name": "envguard-node",
+  "version": "1.0.0",
+  "description": "Production-ready, type-safe environment variable validation library and CLI for Node.js with zero secrets leakage.",
+  "keywords": [
+    "env",
+    "environment",
+    "validation",
+    "schema",
+    "security",
+    "config",
+    "dotenv",
+    "cli",
+    "typescript"
+  ],
+  "author": "SIDDARTHA577",
+  "license": "MIT",
+  "homepage": "https://github.com/SIDDARTHA577/envguard-node#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SIDDARTHA577/envguard-node.git"
+  },
+  "bugs": {
+    "url": "https://github.com/SIDDARTHA577/envguard-node/issues"
+  },
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "bin": {
+    "envguard": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && node scripts/build.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:pack": "npm pack && node scripts/test-tarball.mjs",
+    "lint": "eslint src/ tests/",
+    "prepack": "npm run build"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^26.6.6",
+    "eslint": "^10.13.0",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.72.1",
+    "vitest": "^5.0.5"
+  }
+}
