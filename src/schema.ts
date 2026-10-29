@@ -36,7 +36,12 @@ export function defineSchema<T extends Schema>(definition: T): T {
     throw new EnvGuardSchemaError('Schema must be a non-null object.');
   }
 
-  for (const [key, validator] of Object.entries(definition)) {
+  const ownKeys = Object.getOwnPropertyNames(definition);
+  for (const key of ownKeys) {
+    if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+      throw new EnvGuardSchemaError(`Schema contains forbidden reserved property key: "${key}"`);
+    }
+    const validator = (definition as Record<string, unknown>)[key];
     if (!key || typeof key !== 'string') {
       throw new EnvGuardSchemaError(`Schema contains an invalid key: ${String(key)}`);
     }
@@ -53,3 +58,4 @@ export function defineSchema<T extends Schema>(definition: T): T {
 
   return Object.freeze({ ...definition });
 }
+

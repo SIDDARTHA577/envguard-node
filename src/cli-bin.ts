@@ -9,3 +9,4 @@ runCli()
     console.error('Fatal CLI error:', err instanceof Error ? err.message : String(err));
     process.exit(2);
   });
+

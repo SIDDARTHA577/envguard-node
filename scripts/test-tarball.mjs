@@ -11,7 +11,8 @@ try {
   execSync('npm init -y', { cwd: tempDir, stdio: 'inherit' });
   execSync(`npm install "${tarballPath}"`, { cwd: tempDir, stdio: 'inherit' });
 
-  const testScript = `
+  // 1. ESM Test
+  const esmTestScript = `
 import { guard, s } from 'envguard-node';
 
 const schema = {
@@ -20,20 +21,36 @@ const schema = {
 };
 
 const result = guard(schema, { PORT: '8080' });
-console.log('Validation success:', result.success);
-console.log('Data:', JSON.stringify(result.data));
+console.log('ESM validation success:', result.success);
 if (result.data.PORT !== 8080 || result.data.APP_ENV !== 'dev') {
   process.exit(1);
 }
 `;
-
-  fs.writeFileSync(path.join(tempDir, 'test.mjs'), testScript);
+  fs.writeFileSync(path.join(tempDir, 'test.mjs'), esmTestScript);
   execSync('node test.mjs', { cwd: tempDir, stdio: 'inherit' });
 
-  // Test CLI
+  // 2. CommonJS Test
+  const cjsTestScript = `
+const { guard, s } = require('envguard-node');
+
+const schema = {
+  PORT: s.port().default(3000),
+  DEBUG: s.boolean().default(false)
+};
+
+const result = guard(schema, { PORT: '9000', DEBUG: 'true' });
+console.log('CJS validation success:', result.success);
+if (result.data.PORT !== 9000 || result.data.DEBUG !== true) {
+  process.exit(1);
+}
+`;
+  fs.writeFileSync(path.join(tempDir, 'test.cjs'), cjsTestScript);
+  execSync('node test.cjs', { cwd: tempDir, stdio: 'inherit' });
+
+  // 3. Test CLI executable
   execSync('npx envguard --version', { cwd: tempDir, stdio: 'inherit' });
 
-  console.log('Tarball smoke test PASSED successfully!');
+  console.log('Tarball smoke test (ESM + CommonJS + CLI) PASSED successfully!');
 } finally {
   try {
     fs.rmSync(tempDir, { recursive: true, force: true });

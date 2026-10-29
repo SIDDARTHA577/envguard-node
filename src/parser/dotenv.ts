@@ -1,25 +1,88 @@
+import { EnvGuardConfigError } from '../errors.js';
+
+export interface ParseDotenvOptions {
+  /**
+   * Maximum allowed file size in bytes to prevent Denial of Service attacks.
+   * Default: 5MB (5 * 1024 * 1024 bytes)
+   */
+  maxBytes?: number;
+
+  /**
+   * If true, throws or records warnings when duplicate keys are encountered.
+   * Default: false (standard dotenv behavior: last value wins)
+   */
+  detectDuplicates?: boolean;
+}
+
+export interface ParseDotenvResult {
+  env: Record<string, string>;
+  duplicateKeys: string[];
+}
+
+const DEFAULT_MAX_BYTES = 5 * 1024 * 1024; // 5 MB
+
 /**
  * Safe, zero-eval parser for .env files.
  * Correctly parses key-value pairs without executing any arbitrary scripts or shell substitutions.
+ * Strips UTF-8 Byte Order Marks (BOM), guards against Denial-of-Service via file size limits,
+ * and handles multi-line strings, escapes, and CRLF line breaks.
  */
-export function parseDotenv(content: string): Record<string, string> {
+export function parseDotenv(
+  content: string,
+  options: ParseDotenvOptions = {}
+): Record<string, string> {
+  const { env } = parseDotenvWithMetadata(content, options);
+  return env;
+}
+
+/**
+ * Advanced dotenv parser that also returns structural metadata such as duplicate keys.
+ */
+export function parseDotenvWithMetadata(
+  content: string,
+  options: ParseDotenvOptions = {}
+): ParseDotenvResult {
+  const maxBytes = options.maxBytes ?? DEFAULT_MAX_BYTES;
+  if (typeof content !== 'string') {
+    throw new EnvGuardConfigError('Dotenv content must be a string.');
+  }
+
+  // Guard against oversized inputs / memory exhaustion DoS
+  const byteLength = Buffer.byteLength(content, 'utf8');
+  if (byteLength > maxBytes) {
+    throw new EnvGuardConfigError(
+      `Dotenv content exceeds maximum allowed size (${byteLength} bytes > ${maxBytes} bytes limit).`
+    );
+  }
+
+  // Strip UTF-8 Byte Order Mark (BOM) if present
+  let cleanContent = content;
+  if (cleanContent.charCodeAt(0) === 0xfeff) {
+    cleanContent = cleanContent.slice(1);
+  }
+
   const result: Record<string, string> = {};
-  const lines = content.split(/\r?\n/);
+  const duplicateKeys: string[] = [];
+  const seenKeys = new Set<string>();
+
+  const lines = cleanContent.split(/\r?\n/);
 
   let currentKey: string | null = null;
   let currentValue = '';
   let inDoubleQuote = false;
   let inSingleQuote = false;
 
-  for (const line of lines) {
-    // If we're inside a multiline quote
+  for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+    const line = lines[lineIndex];
+
+    // Multi-line double-quoted value continuation
     if (inDoubleQuote) {
       const closingIndex = findClosingQuote(line, '"');
       if (closingIndex !== -1) {
         currentValue += '\n' + line.slice(0, closingIndex);
         inDoubleQuote = false;
         if (currentKey) {
-          result[currentKey] = unescapeDoubleQuotes(currentValue);
+          assignKey(currentKey, unescapeDoubleQuotes(currentValue));
           currentKey = null;
           currentValue = '';
         }
@@ -29,13 +92,14 @@ export function parseDotenv(content: string): Record<string, string> {
       continue;
     }
 
+    // Multi-line single-quoted value continuation
     if (inSingleQuote) {
       const closingIndex = line.indexOf("'");
       if (closingIndex !== -1) {
         currentValue += '\n' + line.slice(0, closingIndex);
         inSingleQuote = false;
         if (currentKey) {
-          result[currentKey] = currentValue;
+          assignKey(currentKey, currentValue);
           currentKey = null;
           currentValue = '';
         }
@@ -55,13 +119,19 @@ export function parseDotenv(content: string): Record<string, string> {
     // Strip optional "export " prefix
     const lineWithoutExport = trimmed.startsWith('export ') ? trimmed.slice(7).trim() : trimmed;
 
-    // Find the first equals sign
+    // Find first equals sign
     const equalsIndex = lineWithoutExport.indexOf('=');
     if (equalsIndex === -1) {
       continue;
     }
 
     const key = lineWithoutExport.slice(0, equalsIndex).trim();
+
+    // Disallow dangerous keys to prevent prototype pollution
+    if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+      continue;
+    }
+
     if (!key || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) {
       continue;
     }
@@ -72,9 +142,8 @@ export function parseDotenv(content: string): Record<string, string> {
     if (rawVal.startsWith('"')) {
       const closingIndex = findClosingQuote(rawVal.slice(1), '"');
       if (closingIndex !== -1) {
-        result[key] = unescapeDoubleQuotes(rawVal.slice(1, closingIndex + 1));
+        assignKey(key, unescapeDoubleQuotes(rawVal.slice(1, closingIndex + 1)));
       } else {
-        // Multi-line double quote starts
         inDoubleQuote = true;
         currentKey = key;
         currentValue = rawVal.slice(1);
@@ -82,24 +151,34 @@ export function parseDotenv(content: string): Record<string, string> {
     } else if (rawVal.startsWith("'")) {
       const closingIndex = rawVal.indexOf("'", 1);
       if (closingIndex !== -1) {
-        result[key] = rawVal.slice(1, closingIndex);
+        assignKey(key, rawVal.slice(1, closingIndex));
       } else {
-        // Multi-line single quote starts
         inSingleQuote = true;
         currentKey = key;
         currentValue = rawVal.slice(1);
       }
     } else {
-      // Unquoted value: strip trailing comments if separated by space
+      // Unquoted value: strip trailing comment if preceded by space
       const commentIndex = rawVal.search(/\s+#/);
       if (commentIndex !== -1) {
         rawVal = rawVal.slice(0, commentIndex);
       }
-      result[key] = rawVal.trim();
+      assignKey(key, rawVal.trim());
     }
   }
 
-  return result;
+  function assignKey(k: string, val: string) {
+    if (seenKeys.has(k)) {
+      if (!duplicateKeys.includes(k)) {
+        duplicateKeys.push(k);
+      }
+    } else {
+      seenKeys.add(k);
+    }
+    result[k] = val;
+  }
+
+  return { env: result, duplicateKeys };
 }
 
 function findClosingQuote(str: string, quoteChar: string): number {

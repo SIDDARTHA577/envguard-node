@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { guard } from '../src/guard.js';
-import { s } from '../src/schema.js';
+import { s, defineSchema } from '../src/schema.js';
+import { parseJsonSchema } from '../src/config/loader.js';
 import { formatTerminalReport, formatJsonReport } from '../src/cli/reporter.js';
-import { EnvGuardValidationError } from '../src/errors.js';
+import { EnvGuardValidationError, EnvGuardSchemaError } from '../src/errors.js';
 
 describe('Security and Secret Redaction Guarantees', () => {
   const SENSITIVE_TOKEN = 'sk_live_998877665544332211_SUPER_SECRET';
@@ -71,7 +72,6 @@ describe('Security and Secret Redaction Guarantees', () => {
     const schema = {
       TOKEN: s.string().custom((val) => {
         if (val.includes('SECRET')) {
-          // Intentional failure
           return false;
         }
         return true;
@@ -92,5 +92,43 @@ describe('Security and Secret Redaction Guarantees', () => {
     const fullReport = formatTerminalReport(result) + formatJsonReport(result);
     expect(fullReport).not.toContain(SENSITIVE_TOKEN);
     expect(fullReport).not.toContain(SENSITIVE_PASSWORD);
+  });
+
+  describe('Prototype Pollution Prevention', () => {
+    it('rejects __proto__, constructor, and prototype in defineSchema', () => {
+      const maliciousProto = {};
+      Object.defineProperty(maliciousProto, '__proto__', {
+        value: s.string(),
+        enumerable: true,
+        configurable: true,
+      });
+
+      expect(() =>
+        defineSchema(maliciousProto as unknown as Record<string, unknown>)
+      ).toThrow(EnvGuardSchemaError);
+
+      expect(() =>
+        defineSchema({
+          constructor: s.string(),
+        } as unknown as Record<string, unknown>)
+      ).toThrow(EnvGuardSchemaError);
+
+      expect(() =>
+        defineSchema({
+          prototype: s.string(),
+        } as unknown as Record<string, unknown>)
+      ).toThrow(EnvGuardSchemaError);
+    });
+
+    it('rejects __proto__, constructor, and prototype in parseJsonSchema', () => {
+      const jsonWithProto = JSON.parse('{"__proto__": {"type": "string"}}');
+      expect(() => parseJsonSchema(jsonWithProto)).toThrow(EnvGuardSchemaError);
+
+      const jsonWithConstructor = JSON.parse('{"constructor": {"type": "string"}}');
+      expect(() => parseJsonSchema(jsonWithConstructor)).toThrow(EnvGuardSchemaError);
+
+      const jsonWithPrototype = JSON.parse('{"prototype": {"type": "string"}}');
+      expect(() => parseJsonSchema(jsonWithPrototype)).toThrow(EnvGuardSchemaError);
+    });
   });
 });
