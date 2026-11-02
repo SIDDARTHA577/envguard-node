@@ -1,7 +1,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { execSync } from 'node:child_process';
+
+import { syncCodexSkills } from './sync-codex-skills.mjs';
 
 const distDir = path.resolve('dist');
+
+// Synchronize skills to .agents/skills for Codex discovery
+syncCodexSkills();
 
 // 1. Ensure dist/cli.js starts with shebang
 const cliPath = path.join(distDir, 'cli-bin.js');
@@ -15,18 +21,27 @@ if (fs.existsSync(cliPath)) {
   fs.writeFileSync(targetCli, content, { mode: 0o755 });
 }
 
-// 2. Generate CommonJS wrapper for CJS compatibility
-const cjsWrapper = `// EnvGuard CommonJS compatibility bridge
-const esmModulePromise = import('./index.js');
-
-module.exports = new Proxy({}, {
-  get(_target, prop) {
-    throw new Error(
-      \`EnvGuard is published as an ES Module. To use it in CommonJS, use dynamic import: const { guard, s } = await import('envguard-node');\`
-    );
+// 2. Build CommonJS distribution for dual CJS/ESM support
+try {
+  execSync('npx tsc -p tsconfig.cjs.json', { stdio: 'inherit' });
+  const cjsDir = path.join(distDir, 'cjs');
+  if (!fs.existsSync(cjsDir)) {
+    fs.mkdirSync(cjsDir, { recursive: true });
   }
-});
+  // Isolate CJS scope so Node treats .js inside dist/cjs as CommonJS
+  fs.writeFileSync(
+    path.join(cjsDir, 'package.json'),
+    JSON.stringify({ type: 'commonjs' }, null, 2),
+    'utf8'
+  );
+  const cjsBridge = `// Dual CommonJS and ESM bridge for envguard-node
+module.exports = require('./cjs/index.js');
 `;
+  fs.writeFileSync(path.join(distDir, 'index.cjs'), cjsBridge, 'utf8');
+  console.log('CommonJS distribution compiled successfully.');
+} catch (err) {
+  console.error('Failed to compile CommonJS build:', err);
+  process.exit(1);
+}
 
-fs.writeFileSync(path.join(distDir, 'index.cjs'), cjsWrapper, 'utf8');
 console.log('Build post-processing completed successfully.');

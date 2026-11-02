@@ -1,0 +1,29 @@
+name: Feature Request
+description: Suggest an idea or enhancement for EnvGuard
+title: "feat: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please suggest practical enhancements that fit EnvGuard's mission (offline, zero-secret-leakage, type-safe validation).
+  - type: textarea
+    id: problem
+    attributes:
+      label: Is your feature request related to a problem?
+      description: A clear description of the use case or pain point.
+    validations:
+      required: true
+  - type: textarea
+    id: proposed-solution
+    attributes:
+      label: Proposed Solution
+      description: Describe how the new validator, CLI option, or feature should behave.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternative Approaches Considered
+      description: Any alternative solutions or workarounds you've considered.
+

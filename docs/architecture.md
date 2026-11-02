@@ -21,3 +21,4 @@ EnvGuard is designed with four foundational principles:
 4. **Zero Runtime Dependencies**:
    - EnvGuard depends solely on native Node.js standard library modules (`node:fs`, `node:path`, `node:url`).
    - This eliminates supply-chain risks, ensures lightweight installs, and guarantees rapid execution in CI/CD environments.
+

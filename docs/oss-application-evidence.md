@@ -8,7 +8,7 @@
 ## 1. Project Profile and Maintainer Information
 
 * **Project Name**: EnvGuard (`envguard-node`)
-* **Project Purpose**: Production-ready, zero-secrets-leakage environment configuration validation library and CLI for Node.js / TypeScript applications. Helps teams catch configuration errors and missing secrets before deploying to production without risking credential exposure in logs or error traces.
+* **Project Purpose**: Production-ready environment configuration validation library and CLI for Node.js / TypeScript applications. Helps teams catch configuration errors and missing secrets before deploying to production with built-in value redaction in diagnostics.
 * **Target Users**: Node.js and TypeScript developers, backend engineers, DevOps/SRE teams maintaining CI/CD deployment pipelines.
 * **Maintainer**: `SIDDARTHA577` (Primary Creator and Lead Maintainer)
 * **Maintainer Contact**: `190904900+SIDDARTHA577@users.noreply.github.com`
@@ -60,3 +60,4 @@ To build genuine open-source qualification evidence over time without artificial
 - [ ] Welcome first external issue reports and community pull requests.
 - [ ] Track organic npm download figures and dependent GitHub repositories via npm / libraries.io.
 - [ ] Revisit Claude for Open Source application once adoption thresholds (or maintainer contribution benchmarks) are demonstrably verified.
+
