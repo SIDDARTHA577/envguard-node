@@ -159,12 +159,27 @@ export function parseDotenvWithMetadata(
       }
     } else {
       // Unquoted value: strip trailing comment if preceded by space
-      const commentIndex = rawVal.search(/\s+#/);
+      // Using deterministic linear character scan to avoid polynomial regex ReDoS hazards
+      const commentIndex = findTrailingCommentIndex(rawVal);
       if (commentIndex !== -1) {
         rawVal = rawVal.slice(0, commentIndex);
       }
       assignKey(key, rawVal.trim());
     }
+  }
+
+  function findTrailingCommentIndex(str: string): number {
+    for (let i = 1; i < str.length; i++) {
+      if (str[i] === '#' && (str[i - 1] === ' ' || str[i - 1] === '\t')) {
+        // Backtrack to find beginning of whitespace preceding '#'
+        let wsStart = i - 1;
+        while (wsStart > 0 && (str[wsStart - 1] === ' ' || str[wsStart - 1] === '\t')) {
+          wsStart--;
+        }
+        return wsStart;
+      }
+    }
+    return -1;
   }
 
   function assignKey(k: string, val: string) {
