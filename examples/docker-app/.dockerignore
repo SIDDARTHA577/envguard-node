@@ -1,0 +1,10 @@
+# CRITICAL: Never bake secrets into image layers
+.env
+.env.*
+!.env.example
+*.local
+node_modules
+npm-debug.log
+.git
+.github
+

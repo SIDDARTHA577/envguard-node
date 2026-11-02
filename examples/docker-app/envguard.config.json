@@ -1,0 +1,21 @@
+{
+  "schema": {
+    "PORT": {
+      "type": "port",
+      "default": 8080
+    },
+    "DATABASE_URL": {
+      "type": "url",
+      "protocols": ["postgres:", "postgresql:"],
+      "required": true,
+      "sensitive": true
+    },
+    "APP_SECRET": {
+      "type": "string",
+      "min": 32,
+      "required": true,
+      "sensitive": true
+    }
+  }
+}
+

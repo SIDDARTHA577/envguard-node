@@ -30,3 +30,4 @@ console.log(`Application started in ${config.NODE_ENV} mode.`);
 console.log(`Listening on port ${config.PORT}`);
 console.log(`Analytics enabled: ${config.ENABLE_ANALYTICS}`);
 // Secret values were validated without being printed or leaked
+

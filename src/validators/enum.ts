@@ -42,3 +42,4 @@ export class EnumValidator<const T extends readonly string[]> extends BaseValida
     return { valid: true, value: raw as T[number] };
   }
 }
+

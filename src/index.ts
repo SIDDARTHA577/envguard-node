@@ -23,7 +23,12 @@ export { UrlValidator, type UrlValidatorOptions } from './validators/url.js';
 export { EnumValidator } from './validators/enum.js';
 
 // Parsers and loaders
-export { parseDotenv } from './parser/dotenv.js';
+export {
+  parseDotenv,
+  parseDotenvWithMetadata,
+  type ParseDotenvOptions,
+  type ParseDotenvResult,
+} from './parser/dotenv.js';
 export {
   loadConfigFile,
   parseJsonSchema,
@@ -50,3 +55,4 @@ export type {
   ValidationResult,
   GuardOptions,
 } from './types.js';
+

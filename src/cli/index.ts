@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { guard } from '../guard.js';
 import { loadConfigFile } from '../config/loader.js';
-import { parseDotenv } from '../parser/dotenv.js';
+import { parseDotenvWithMetadata } from '../parser/dotenv.js';
 import { formatTerminalReport, formatJsonReport } from './reporter.js';
 import { executeInit } from './init.js';
 import { EnvGuardConfigError, EnvGuardSchemaError } from '../errors.js';
@@ -149,6 +149,7 @@ export async function runCli(argv = process.argv.slice(2)): Promise<number> {
 
     if (parsed.command === 'check') {
       const loaded = await loadConfigFile(parsed.schema);
+      const warnings: string[] = [];
 
       let targetEnv: Record<string, string | undefined>;
       if (parsed.envFile) {
@@ -157,7 +158,13 @@ export async function runCli(argv = process.argv.slice(2)): Promise<number> {
           throw new EnvGuardConfigError(`Specified --env-file does not exist: ${parsed.envFile}`);
         }
         const fileContent = fs.readFileSync(resolvedEnv, 'utf8');
-        targetEnv = parseDotenv(fileContent);
+        const parsedMetadata = parseDotenvWithMetadata(fileContent);
+        targetEnv = parsedMetadata.env;
+
+        if (parsedMetadata.duplicateKeys.length > 0) {
+          const dupList = parsedMetadata.duplicateKeys.join(', ');
+          warnings.push(`Duplicate key(s) detected in ${parsed.envFile}: ${dupList}`);
+        }
       } else {
         targetEnv = process.env;
       }
@@ -167,12 +174,18 @@ export async function runCli(argv = process.argv.slice(2)): Promise<number> {
       });
 
       if (parsed.format === 'json') {
-        console.log(formatJsonReport(result));
+        console.log(
+          formatJsonReport(result, {
+            envguardVersion: VERSION,
+            warnings: warnings.length > 0 ? warnings : undefined,
+          })
+        );
       } else {
         console.log(
           formatTerminalReport(result, {
             schemaPath: path.basename(loaded.filePath),
             envPath: parsed.envFile || 'process.env',
+            warnings: warnings.length > 0 ? warnings : undefined,
           })
         );
       }

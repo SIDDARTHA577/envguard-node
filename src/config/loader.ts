@@ -14,6 +14,8 @@ export const DEFAULT_CONFIG_FILES = [
   '.envguardrc.json',
 ];
 
+const MAX_CONFIG_BYTES = 5 * 1024 * 1024; // 5 MB
+
 export interface LoadedConfig {
   filePath: string;
   schema: Schema;
@@ -22,14 +24,27 @@ export interface LoadedConfig {
 export function parseJsonSchema(jsonObj: Record<string, unknown>): Schema {
   const schema: Schema = {};
 
-  for (const [key, def] of Object.entries(jsonObj)) {
+  if (!jsonObj || typeof jsonObj !== 'object' || Array.isArray(jsonObj)) {
+    throw new EnvGuardSchemaError('JSON schema definition must be a key-value object.');
+  }
+
+  const ownKeys = Object.getOwnPropertyNames(jsonObj);
+  for (const key of ownKeys) {
+    // Prototype pollution protection
+    if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+      throw new EnvGuardSchemaError(
+        `JSON schema contains forbidden reserved property name: "${key}"`
+      );
+    }
+
+    const def = (jsonObj as Record<string, unknown>)[key];
     if (typeof def === 'string') {
-      // Shorthand syntax e.g. "PORT": "port"
       schema[key] = createValidatorFromType(def, {}, key);
     } else if (def && typeof def === 'object' && !Array.isArray(def)) {
-      const typeStr = typeof (def as { type?: unknown }).type === 'string'
-        ? (def as { type: string }).type
-        : 'string';
+      const typeStr =
+        typeof (def as { type?: unknown }).type === 'string'
+          ? (def as { type: string }).type
+          : 'string';
       schema[key] = createValidatorFromType(typeStr, def as Record<string, unknown>, key);
     } else {
       throw new EnvGuardSchemaError(
@@ -59,6 +74,7 @@ function createValidatorFromType(
         max: typeof options.max === 'number' ? options.max : undefined,
         pattern,
         choices,
+        trim: options.trim === true,
       });
       break;
     }
@@ -96,7 +112,7 @@ function createValidatorFromType(
     }
     case 'enum': {
       const values = Array.isArray(options.values || options.enum || options.choices)
-        ? (options.values || options.enum || options.choices) as string[]
+        ? ((options.values || options.enum || options.choices) as string[])
         : [];
       if (values.length === 0) {
         throw new EnvGuardSchemaError(`Enum validator for "${key}" requires an array of values.`);
@@ -129,7 +145,10 @@ function createValidatorFromType(
   return validator;
 }
 
-export async function loadConfigFile(customPath?: string, cwd = process.cwd()): Promise<LoadedConfig> {
+export async function loadConfigFile(
+  customPath?: string,
+  cwd = process.cwd()
+): Promise<LoadedConfig> {
   let targetPath: string | null = null;
 
   if (customPath) {
@@ -151,6 +170,14 @@ export async function loadConfigFile(customPath?: string, cwd = process.cwd()): 
   if (!targetPath) {
     throw new EnvGuardConfigError(
       `No EnvGuard configuration file found. Checked: ${DEFAULT_CONFIG_FILES.join(', ')}. Use "envguard init" to create one.`
+    );
+  }
+
+  // Enforce file size limit to prevent memory exhaustion DoS
+  const stats = fs.statSync(targetPath);
+  if (stats.size > MAX_CONFIG_BYTES) {
+    throw new EnvGuardConfigError(
+      `Configuration file exceeds maximum allowable size (${stats.size} bytes > ${MAX_CONFIG_BYTES} bytes limit).`
     );
   }
 

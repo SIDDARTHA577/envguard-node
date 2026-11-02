@@ -1,0 +1,34 @@
+{
+  "$schema": "https://agents.json.schemastore.org/agent-manifest.json",
+  "name": "envguard",
+  "version": "1.0.0",
+  "description": "Environment variable validation, auditing, and secret leakage prevention skills for AI agents.",
+  "publisher": "SIDDARTHA577",
+  "skills": [
+    {
+      "name": "envguard-audit",
+      "path": "./.agents/skills/envguard-audit/SKILL.md",
+      "description": "Audit repository environment variable usage and recommend a safe schema"
+    },
+    {
+      "name": "envguard-setup",
+      "path": "./.agents/skills/envguard-setup/SKILL.md",
+      "description": "Install and configure EnvGuard in a Node.js project"
+    },
+    {
+      "name": "envguard-review",
+      "path": "./.agents/skills/envguard-review/SKILL.md",
+      "description": "Review environment variable and secret handling for security risks"
+    },
+    {
+      "name": "envguard-ci",
+      "path": "./.agents/skills/envguard-ci/SKILL.md",
+      "description": "Integrate EnvGuard into automated CI/CD pipelines"
+    },
+    {
+      "name": "envguard-migrate",
+      "path": "./.agents/skills/envguard-migrate/SKILL.md",
+      "description": "Safely migrate codebase from raw process.env to EnvGuard"
+    }
+  ]
+}

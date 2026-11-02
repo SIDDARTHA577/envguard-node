@@ -48,3 +48,4 @@ export class BooleanValidator extends BaseValidator<boolean> {
     };
   }
 }
+

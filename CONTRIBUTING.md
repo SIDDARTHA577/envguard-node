@@ -55,3 +55,4 @@ All contributors must adhere to our [Code of Conduct](./CODE_OF_CONDUCT.md). Ple
 3. Ensure all tests pass (`npm test`) and lint checks pass (`npm run lint`).
 4. Keep PRs focused on a single change.
 5. Provide a clear summary in your PR description explaining the problem, the solution, and test evidence.
+

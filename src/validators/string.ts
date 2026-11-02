@@ -6,6 +6,7 @@ export interface StringValidatorOptions {
   max?: number;
   pattern?: RegExp;
   choices?: string[];
+  trim?: boolean;
 }
 
 export class StringValidator extends BaseValidator<string> {
@@ -13,6 +14,30 @@ export class StringValidator extends BaseValidator<string> {
 
   constructor(private readonly options: StringValidatorOptions = {}) {
     super();
+  }
+
+  /**
+   * Automatically trims leading and trailing whitespace before evaluating constraints.
+   */
+  public trim(): StringValidator {
+    const clone = this.clone() as StringValidator;
+    (clone as unknown as { options: StringValidatorOptions }).options = {
+      ...this.options,
+      trim: true,
+    };
+    return clone;
+  }
+
+  /**
+   * Enforces that the string contains at least one character.
+   */
+  public nonempty(): StringValidator {
+    const clone = this.clone() as StringValidator;
+    (clone as unknown as { options: StringValidatorOptions }).options = {
+      ...this.options,
+      min: Math.max(this.options.min ?? 1, 1),
+    };
+    return clone;
   }
 
   protected coerceAndValidate(raw: unknown, key: string): ValidatorResult<string> {
@@ -30,7 +55,7 @@ export class StringValidator extends BaseValidator<string> {
       };
     }
 
-    const val = raw;
+    const val = this.options.trim ? raw.trim() : raw;
 
     if (this.options.min !== undefined && val.length < this.options.min) {
       return {

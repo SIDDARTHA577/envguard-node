@@ -38,6 +38,22 @@ describe('Validators', () => {
       expect(v.validate('red', 'COLOR').valid).toBe(true);
       expect(v.validate('yellow', 'COLOR').valid).toBe(false);
     });
+
+    it('trims whitespace when .trim() is used', () => {
+      const v = s.string({ min: 3 }).trim();
+      expect(v.validate('   abc   ', 'KEY')).toEqual({ valid: true, value: 'abc' });
+      // without trim '  ' would be 2 characters
+      const untrimmed = s.string({ min: 3 });
+      expect(untrimmed.validate(' a ', 'KEY').valid).toBe(true);
+      const trimmed = s.string({ min: 3 }).trim();
+      expect(trimmed.validate(' a ', 'KEY').valid).toBe(false);
+    });
+
+    it('enforces nonempty strings when .nonempty() is used', () => {
+      const v = s.string().nonempty();
+      expect(v.validate('a', 'KEY').valid).toBe(true);
+      expect(v.validate('', 'KEY').valid).toBe(false);
+    });
   });
 
   describe('NumberValidator and IntegerValidator', () => {
@@ -199,3 +215,4 @@ describe('Validators', () => {
     });
   });
 });
+
