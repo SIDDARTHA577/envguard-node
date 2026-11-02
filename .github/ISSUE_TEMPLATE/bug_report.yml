@@ -37,10 +37,10 @@ body:
     attributes:
       label: Node.js Version
       options:
-        - "Node.js 24.x"
-        - "Node.js 22.x (Active LTS)"
-        - "Node.js 20.x (Maintenance LTS)"
-        - "Other / EOL version (Node.js 18 or older)"
+        - "Node.js 26.x (Active LTS)"
+        - "Node.js 24.x (Maintenance LTS)"
+        - "Node.js 22.x (Maintenance LTS)"
+        - "Other / EOL version (Node.js 20 or older)"
     validations:
       required: true
   - type: dropdown

@@ -1,5 +1,5 @@
 # Multi-stage production container build
-FROM node:20-alpine AS runner
+FROM node:26-alpine AS runner
 
 WORKDIR /app
 

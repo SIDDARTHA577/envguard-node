@@ -3,15 +3,15 @@
 [![CI](https://github.com/SIDDARTHA577/envguard-node/actions/workflows/ci.yml/badge.svg)](https://github.com/SIDDARTHA577/envguard-node/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/SIDDARTHA577/envguard-node/actions/workflows/codeql.yml/badge.svg)](https://github.com/SIDDARTHA577/envguard-node/actions/workflows/codeql.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![Node.js: >=20.0.0](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen.svg)](https://nodejs.org/)
+[![Node.js: ^22.0.0 || ^24.0.0 || ^26.0.0](https://img.shields.io/badge/node-%5E22%20%7C%7C%20%5E24%20%7C%7C%20%5E26-brightgreen.svg)](https://nodejs.org/)
 
 > **Dependency-free environment configuration validation for Node.js, CI/CD pipelines, and AI-assisted development.**
 
 ---
 
 > [!IMPORTANT]
-> **Pre-Release Notice**: `envguard-node` is currently in development and has **not yet been published to the public npm registry**. Running `npm install envguard-node` will return HTTP 404 until the initial release is approved and published.
-> To use or evaluate EnvGuard today, follow the tested **[Local Source Installation](#installation-and-testing-pre-release)** instructions below.
+> **Pre-Release Notice**: `envguard-node` is in development and has **not yet been published to the public npm registry**. Running `npm install envguard-node` will return HTTP 404 until the initial release is approved and published.
+> To use or evaluate EnvGuard today, follow the tested **[Local Source Installation](#4-installation--setup)** instructions below.
 
 ---
 
@@ -60,13 +60,15 @@ const config = guard({
 
 ## 3. Supported Node.js Versions
 
-EnvGuard officially supports maintained Node.js LTS and current releases across **Linux (Ubuntu)** and **Windows**:
-- Node.js `24.x` (Current / Future LTS)
-- Node.js `22.x` (Active LTS)
-- Node.js `20.x` (Maintenance LTS)
+EnvGuard officially supports maintained Node.js LTS releases across **Linux (Ubuntu)** and **Windows**:
+- Node.js `26.x` (Active LTS)
+- Node.js `24.x` (Maintenance LTS)
+- Node.js `22.x` (Maintenance LTS)
+
+The package `engines.node` specification is set to `^22.0.0 || ^24.0.0 || ^26.0.0`.
 
 > [!NOTE]
-> Node.js 18 reached official End-of-Life (EOL) on April 30, 2025. Modern test tooling and V8 APIs (e.g. `node:util` `styleText`) require Node.js `>=20.0.0`. Older Node versions are not supported.
+> Node.js 18 reached official End-of-Life (EOL) on April 30, 2025, and Node.js 20 reached End-of-Life on October 27, 2026. EOL Node versions are not supported.
 
 Zero runtime dependencies. Pure Node.js standard libraries only (`node:fs`, `node:path`, `node:url`).
 
@@ -74,7 +76,17 @@ Zero runtime dependencies. Pure Node.js standard libraries only (`node:fs`, `nod
 
 ## 4. Installation & Setup
 
-### Local Source Installation (Pre-Release / Current)
+### Package Name vs CLI Executable Name
+
+| Entity | Identifier | Description |
+|---|---|---|
+| **npm package name** | `envguard-node` | The official package published on the registry / installed in `package.json`. |
+| **CLI command name** | `envguard` | The executable binary declared in `package.json` `bin`. |
+
+> [!WARNING]
+> Do NOT run `npx envguard` without the package installed locally. Running `npx <name>` when not installed locally can cause npm to download an unrelated third-party package named `envguard`. Always use the commands documented below.
+
+### Pre-Release Source / Tarball Installation (Current Tested Workflow)
 
 Since `envguard-node` is not yet on the public npm registry, install from source or a local tarball:
 
@@ -84,54 +96,61 @@ git clone https://github.com/SIDDARTHA577/envguard-node.git
 cd envguard-node
 
 # Install dependencies and build
-npm install
+npm ci
 npm run build
 
-# Link globally for local development
-npm link
+# Option A: Build and install a self-contained tarball into your project
+npm pack
+cd /path/to/your-project
+npm install /path/to/envguard-node/envguard-node-1.0.0.tgz
 
-# In your consumer project:
+# Option B: Link globally for local development
+cd /path/to/envguard-node
+npm link
+cd /path/to/your-project
 npm link envguard-node
 ```
 
-Alternatively, build a self-contained tarball:
-```bash
-npm pack
-# Installs the generated archive in your target application
-npm install /path/to/envguard-node-1.0.0.tgz
-```
+### Post-Publication npm Installation Workflow (After Official Release)
 
-### Future Public npm Installation (Post-Publication Workflow)
-
-*The following commands will become active upon official release approval:*
+*The following commands will apply once the package is published to the public registry:*
 
 ```bash
-# Library dependency
+# 1. Install as a project runtime dependency
 npm install envguard-node
 
-# Project-local CLI dependency for scripts and CI
-npm install -D envguard-node
-```
+# 2. Or install as a project development dependency for CLI usage
+npm install --save-dev envguard-node
 
-> **Note on Naming**: The npm package name is `envguard-node`. The installed command-line executable is `envguard` (invoked via `npx envguard`).
+# 3. Execute the locally installed CLI binary safely:
+npx --no-install envguard check
+
+# 4. Or explicitly specify the package via npm exec:
+npm exec --package=envguard-node -- envguard check
+```
 
 ---
 
 ## 5. Quickstart (30 Seconds)
 
 ### Step 1: Initialize Configuration
+Using the locally installed package:
 ```bash
-npx envguard init
+npx --no-install envguard init --type json
+```
+Or with explicit package resolution:
+```bash
+npm exec --package=envguard-node -- envguard init --type json
 ```
 This safely creates a starter `envguard.config.json` and a clean `.env.example` without silently overwriting existing files.
 
 ### Step 2: Validate Environment
 ```bash
 # Validate against current environment
-npx envguard check
+npx --no-install envguard check
 
 # Validate against a specific environment file
-npx envguard check --env-file .env.example
+npx --no-install envguard check --schema envguard.config.json --env-file .env.example
 ```
 
 ---
@@ -175,22 +194,22 @@ const { guard, s, defineSchema } = require('envguard-node');
 
 ```bash
 # Check current environment
-npx envguard check
+npx --no-install envguard check
 
 # Check with an explicit schema file
-npx envguard check --schema ./envguard.config.json
+npx --no-install envguard check --schema ./envguard.config.json
 
 # Check against a specified .env file
-npx envguard check --env-file .env.production
+npx --no-install envguard check --env-file .env.production
 
 # Machine-readable JSON output for automated CI processing
-npx envguard check --format json
+npx --no-install envguard check --format json
 
 # Strict mode: fail if unexpected variables exist
-npx envguard check --strict
+npx --no-install envguard check --strict
 
 # Initialize starter configuration and safe .env.example
-npx envguard init [--type json|js] [--force]
+npx --no-install envguard init [--type json|js] [--force]
 ```
 
 ### Deterministic Exit Codes
@@ -259,7 +278,7 @@ We welcome community pull requests and bug reports! See [CONTRIBUTING.md](./CONT
 # Clone and install dependencies
 git clone https://github.com/SIDDARTHA577/envguard-node.git
 cd envguard-node
-npm install
+npm ci
 
 # Run checks
 npm run typecheck

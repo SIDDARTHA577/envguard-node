@@ -28,3 +28,4 @@ export function syncCodexSkills(rootDir = path.resolve('.')) {
     fs.writeFileSync(path.join(targetFolder, 'SKILL.md'), content, 'utf8');
   }
 }
+
