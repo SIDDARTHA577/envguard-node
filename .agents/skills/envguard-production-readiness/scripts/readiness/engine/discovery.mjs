@@ -140,6 +140,77 @@ function classifyApplication(appDir, relPath, manifest) {
     languages.push('javascript');
   }
 
+  // Detect Python signals
+  const pythonManifests = ['pyproject.toml', 'requirements.txt', 'Pipfile', 'setup.py', 'setup.cfg', 'manage.py'];
+  const hasPythonManifest = pythonManifests.some((m) => fs.existsSync(path.join(appDir, m)));
+  let hasPyFiles = hasPythonManifest;
+  if (!hasPyFiles) {
+    try {
+      hasPyFiles = fs.readdirSync(appDir).some((f) => f.endsWith('.py'));
+    } catch {}
+  }
+  if (hasPyFiles) {
+    languages.push('python');
+    let pyManifestContent = '';
+    for (const m of ['requirements.txt', 'pyproject.toml', 'Pipfile']) {
+      const p = path.join(appDir, m);
+      if (fs.existsSync(p)) {
+        try {
+          pyManifestContent += ' ' + fs.readFileSync(p, 'utf8').toLowerCase();
+        } catch {}
+      }
+    }
+    if (fs.existsSync(path.join(appDir, 'manage.py')) || pyManifestContent.includes('django')) {
+      frameworks.push('django');
+    }
+    if (pyManifestContent.includes('fastapi')) {
+      frameworks.push('fastapi');
+    }
+    if (pyManifestContent.includes('flask')) {
+      frameworks.push('flask');
+    }
+    if (pyManifestContent.includes('sqlalchemy')) {
+      databases.push('sqlalchemy');
+    }
+    if (pyManifestContent.includes('tortoise-orm')) {
+      databases.push('tortoise');
+    }
+  }
+
+  // Detect Java / Kotlin signals
+  const javaManifests = ['pom.xml', 'build.gradle', 'build.gradle.kts', 'settings.gradle', 'settings.gradle.kts'];
+  const hasJavaManifest = javaManifests.some((m) => fs.existsSync(path.join(appDir, m)));
+  let hasJavaFiles = hasJavaManifest;
+  if (!hasJavaFiles) {
+    try {
+      hasJavaFiles = fs.readdirSync(appDir).some((f) => f.endsWith('.java') || f.endsWith('.kt'));
+    } catch {}
+  }
+  if (hasJavaFiles) {
+    languages.push('java');
+    let javaDescriptorContent = '';
+    for (const m of ['pom.xml', 'build.gradle', 'build.gradle.kts']) {
+      const p = path.join(appDir, m);
+      if (fs.existsSync(p)) {
+        try {
+          javaDescriptorContent += ' ' + fs.readFileSync(p, 'utf8').toLowerCase();
+        } catch {}
+      }
+    }
+    if (javaDescriptorContent.includes('spring-boot') || javaDescriptorContent.includes('org.springframework.boot')) {
+      frameworks.push('spring-boot');
+    }
+    if (javaDescriptorContent.includes('spring-boot-starter-data-jpa') || javaDescriptorContent.includes('hibernate')) {
+      databases.push('jpa-hibernate');
+    }
+    if (javaDescriptorContent.includes('flyway')) {
+      databases.push('flyway');
+    }
+    if (javaDescriptorContent.includes('liquibase')) {
+      databases.push('liquibase');
+    }
+  }
+
   // Detect deployment targets
   const deploymentTargets = [];
   if (
@@ -162,9 +233,27 @@ function classifyApplication(appDir, relPath, manifest) {
   let uncertaintyReason = null;
 
   if (!manifest) {
-    type = 'unknown';
-    confidence = 'uncertain';
-    uncertaintyReason = 'No package.json manifest found in application directory.';
+    if (languages.includes('python')) {
+      if (frameworks.includes('django') || frameworks.includes('fastapi') || frameworks.includes('flask')) {
+        type = 'backend';
+        confidence = 'verified';
+      } else {
+        type = 'backend';
+        confidence = 'inferred';
+      }
+    } else if (languages.includes('java')) {
+      if (frameworks.includes('spring-boot')) {
+        type = 'backend';
+        confidence = 'verified';
+      } else {
+        type = 'backend';
+        confidence = 'inferred';
+      }
+    } else {
+      type = 'unknown';
+      confidence = 'uncertain';
+      uncertaintyReason = 'No package.json manifest found in application directory.';
+    }
   } else if (frameworks.includes('nextjs')) {
     // Next.js with app/api or pages/api can be fullstack
     const hasApiRoutes =

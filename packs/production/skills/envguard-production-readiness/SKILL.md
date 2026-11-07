@@ -21,10 +21,38 @@ Guides engineers and AI agents in conducting rigorous, evidence-based applicatio
 - Writing raw database migrations or tuning SQL indexes in isolation (use `envguard-database`).
 
 ## Supported Projects & Environments
-- Runtimes: Node.js (22.x, 24.x, 26.x), Bun, TypeScript, modern JavaScript (ESM / CommonJS).
-- Web & API Frameworks: Express, Fastify, Next.js, NestJS, React, Vue, Svelte.
-- Container & Deployment Tech: Docker, Docker Compose, Kubernetes, GitHub Actions, GitLab CI.
+- Runtimes: Node.js (22.x, 24.x, 26.x), Bun, TypeScript, modern JavaScript (ESM / CommonJS), Python (3.10+), Java (17, 21, 25 LTS).
+- Web & Backend Frameworks: Express, Fastify, Next.js, NestJS, React, Vue, Svelte, Django, FastAPI, Flask, Spring Boot (Maven & Gradle).
+- Container & Deployment Tech: Docker, Docker Compose, Kubernetes, Gunicorn, Uvicorn, GitHub Actions, GitLab CI.
 - Operating Systems: Linux (Ubuntu/Debian), macOS, Windows.
+
+## Supported Platform Adapters
+The Readiness Analyzer employs modular platform adapters that automatically resolve based on repository artifacts:
+1. **Generic Platform Adapter (`GenericAdapter`)**: Baseline environment security (.env, .gitignore), Containerfile inspection, CI workflow audits, and SARIF static analysis import.
+2. **Node.js & TypeScript Adapter (`NodeTypeScriptAdapter`)**: Dependency vulnerability tooling, TypeScript configurations, standard REST server patterns, Prisma/Drizzle/TypeORM migrations and composite indexing, and SQL injection prevention.
+3. **Next.js & React Adapter (`NextJsReactAdapter`)**: Server Actions security, client/server boundary leakage prevention (`NEXT_PUBLIC_`), Image optimization, and React error boundaries.
+4. **Python Platform Adapter (`PythonAdapter`)**: Django (`manage.py`, `settings.py`), FastAPI, and Flask projects. Checks include:
+   - Packaging and lockfiles (`pyproject.toml`, `requirements.txt`, `poetry.lock`, `uv.lock`, `Pipfile`).
+   - Runtime version constraints (PEP 621 `requires-python = ">=3.11"` or `.python-version`).
+   - Production `DEBUG = False` and cryptographic `SECRET_KEY` loading from environment.
+   - Host header guardrails (`ALLOWED_HOSTS`).
+   - Session and CSRF cookie flags (`SESSION_COOKIE_SECURE`, `CSRF_COOKIE_SECURE`).
+   - SQL injection defenses (prohibits f-string or `%` formatting in `cursor.execute()`).
+   - Django `CsrfViewMiddleware` enforcement and CORS origin boundaries.
+   - Database migrations (Django `migrations/` and Alembic `alembic.ini`).
+   - Automated test suite configuration (pytest / unittest).
+   - Production WSGI/ASGI application servers (Gunicorn / Uvicorn).
+5. **Java & Spring Boot Adapter (`JavaSpringBootAdapter`)**: Spring Boot applications with Maven (`pom.xml`) or Gradle (`build.gradle`, `build.gradle.kts`). Checks include:
+   - Build descriptors and wrapper scripts (`mvnw`, `gradlew`).
+   - Explicit target Java versions (`<java.version>21</java.version>`, `sourceCompatibility = '21'`).
+   - Spring Actuator endpoint security (flags wildcard `exposure.include=*`).
+   - Spring Security authorization rules (flags `anyRequest().permitAll()`).
+   - Cryptographic password encoding (flags plaintext `NoOpPasswordEncoder`).
+   - Externalized database credentials (flags plaintext `spring.datasource.password`).
+   - Safe JPA/Hibernate `ddl-auto` modes (flags destructive `create`, `create-drop`, and `update` in favor of `validate` or `none`).
+   - Versioned database migration frameworks (Flyway in `db/migration` or Liquibase in `db/changelog`).
+   - SQL injection defenses (flags raw string concatenation in `createNativeQuery()` or `createQuery()`).
+   - Automated JUnit 5 test suites.
 
 ## Required Tools & Permissions
 - Tools: File reader, file writer, command runner (`read_file`, `write_file`, `run_command`).

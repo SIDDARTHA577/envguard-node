@@ -1,0 +1,15 @@
+spring:
+  application:
+    name: healthy-spring-boot-gradle
+  jpa:
+    hibernate:
+      ddl-auto: none
+  datasource:
+    url: jdbc:postgresql://localhost:5432/appdb
+    password: ${DB_PASSWORD}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+
