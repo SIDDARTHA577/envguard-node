@@ -2,6 +2,8 @@ import { BaseAdapter } from './base-adapter.mjs';
 import { GenericAdapter } from './generic-adapter.mjs';
 import { NodeTypeScriptAdapter } from './node-typescript-adapter.mjs';
 import { NextJsReactAdapter } from './nextjs-react-adapter.mjs';
+import { PythonAdapter } from './python-adapter.mjs';
+import { JavaSpringBootAdapter } from './java-spring-adapter.mjs';
 
 /**
  * Adapter Registry for EnvGuard Assessment Engine.
@@ -98,5 +100,7 @@ export function createDefaultRegistry() {
   registry.register(new GenericAdapter());
   registry.register(new NodeTypeScriptAdapter());
   registry.register(new NextJsReactAdapter());
+  registry.register(new PythonAdapter());
+  registry.register(new JavaSpringBootAdapter());
   return registry;
 }

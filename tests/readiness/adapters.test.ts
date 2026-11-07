@@ -9,6 +9,8 @@ import {
   GenericAdapter,
   NodeTypeScriptAdapter,
   NextJsReactAdapter,
+  PythonAdapter,
+  JavaSpringBootAdapter,
   evaluateReleasePolicy,
   POLICY_OUTCOMES,
 } from '../../tools/readiness-auditor.mjs';
@@ -18,15 +20,17 @@ describe('EnvGuard Multi-Platform Assessment Engine & Adapters', () => {
   const fixturesDir = path.join(rootDir, 'tests', 'fixtures', 'readiness');
 
   describe('1. Adapter Contract & Registry Architecture', () => {
-    it('creates a default registry with all 3 core built-in adapters', () => {
+    it('creates a default registry with all 5 core built-in adapters', () => {
       const registry = createDefaultRegistry();
       const adapters = registry.getAll();
 
-      expect(adapters.length).toBe(3);
-      expect(adapters.map((a) => a.id)).toEqual(['generic', 'node-typescript', 'nextjs-react']);
+      expect(adapters.length).toBe(5);
+      expect(adapters.map((a) => a.id)).toEqual(['generic', 'node-typescript', 'nextjs-react', 'python', 'java-spring']);
       expect(registry.get('generic')).toBeInstanceOf(GenericAdapter);
       expect(registry.get('node-typescript')).toBeInstanceOf(NodeTypeScriptAdapter);
       expect(registry.get('nextjs-react')).toBeInstanceOf(NextJsReactAdapter);
+      expect(registry.get('python')).toBeInstanceOf(PythonAdapter);
+      expect(registry.get('java-spring')).toBeInstanceOf(JavaSpringBootAdapter);
     });
 
     it('validates adapter contract and rejects non-BaseAdapter instances', () => {
