@@ -128,6 +128,136 @@
         "Safely transition our dotenv configuration to EnvGuard"
       ]
     }
+  },
+  {
+    "name": "envguard-system-design",
+    "pack": "fullstack",
+    "description": "Guides software architects and AI agents through requirements gathering, system architecture selection, component boundaries, data flows, API contracts, risk assessment, and Architecture Decision Records (ADRs).",
+    "canonicalDir": "packs/fullstack/skills/envguard-system-design",
+    "version": "1.0.0",
+    "supportedHosts": ["codex", "antigravity", "claude-code", "cursor"],
+    "requiredTools": ["read_file", "write_file"],
+    "requiredPermissions": ["workspace-write"],
+    "triggers": {
+      "when": [
+        "Planning a new application, service, or major architectural feature",
+        "Documenting system architecture, component boundaries, or service relationships",
+        "Drafting Architecture Decision Records (ADRs) and technical specifications"
+      ],
+      "whenNot": [
+        "Writing line-by-line implementation code without design needs",
+        "Designing low-level database schemas in detail"
+      ],
+      "suggestedPrompts": [
+        "Design the architecture for our task management application with envguard-system-design",
+        "Plan component boundaries and data flow for a multi-tenant SaaS backend",
+        "Create an ADR evaluating relational vs document storage for our workload"
+      ]
+    }
+  },
+  {
+    "name": "envguard-backend",
+    "pack": "fullstack",
+    "description": "Guides the design, implementation, and verification of secure, production-grade Node.js and TypeScript backend APIs with input validation, structured errors, EnvGuard configuration validation, graceful shutdown, and integration testing.",
+    "canonicalDir": "packs/fullstack/skills/envguard-backend",
+    "version": "1.0.0",
+    "supportedHosts": ["codex", "antigravity", "claude-code", "cursor"],
+    "requiredTools": ["read_file", "write_file", "run_command"],
+    "requiredPermissions": ["workspace-write"],
+    "triggers": {
+      "when": [
+        "Creating or refactoring Node.js / TypeScript RESTful backend services",
+        "Implementing API routes, request validation, and structured error responses",
+        "Adding startup configuration validation using EnvGuard (guard())"
+      ],
+      "whenNot": [
+        "Writing frontend React components or CSS",
+        "Planning high-level distributed systems architecture"
+      ],
+      "suggestedPrompts": [
+        "Build a secure RESTful task API in Express with envguard-backend",
+        "Add input validation, structured errors, and health checks to our backend service",
+        "Implement graceful shutdown and EnvGuard startup validation for our Node.js API"
+      ]
+    }
+  },
+  {
+    "name": "envguard-database",
+    "pack": "fullstack",
+    "description": "Guides relational and document database schema design, indexing strategies, non-destructive migration planning, transaction management, connection pool optimization, and synthetic test fixture generation.",
+    "canonicalDir": "packs/fullstack/skills/envguard-database",
+    "version": "1.0.0",
+    "supportedHosts": ["codex", "antigravity", "claude-code", "cursor"],
+    "requiredTools": ["read_file", "write_file", "run_command"],
+    "requiredPermissions": ["workspace-write"],
+    "triggers": {
+      "when": [
+        "Designing or modifying database tables, collections, and relations",
+        "Planning non-destructive database migrations and schema rollbacks",
+        "Adding performance indexes and optimizing slow query patterns"
+      ],
+      "whenNot": [
+        "Writing HTTP API controllers or Express routes",
+        "Running destructive drop-table migrations on live production databases"
+      ],
+      "suggestedPrompts": [
+        "Design a PostgreSQL schema with migrations for our task system using envguard-database",
+        "Plan a non-destructive migration to add a priority field to the tasks table",
+        "Create synthetic test fixtures and connection pool configuration for SQLite and Postgres"
+      ]
+    }
+  },
+  {
+    "name": "envguard-frontend",
+    "pack": "fullstack",
+    "description": "Guides the development of responsive, component-driven React and TypeScript frontend applications with strict state management, API integration, form validation, accessible loading/error/empty states, and unit testing.",
+    "canonicalDir": "packs/fullstack/skills/envguard-frontend",
+    "version": "1.0.0",
+    "supportedHosts": ["codex", "antigravity", "claude-code", "cursor"],
+    "requiredTools": ["read_file", "write_file", "run_command"],
+    "requiredPermissions": ["workspace-write"],
+    "triggers": {
+      "when": [
+        "Building or refactoring React components, pages, forms, and layouts",
+        "Integrating client applications with RESTful backend APIs",
+        "Managing client state, data fetching, loading spinners, empty states, and error alerts"
+      ],
+      "whenNot": [
+        "Writing backend Express routes or middleware",
+        "Designing database tables or SQL migrations"
+      ],
+      "suggestedPrompts": [
+        "Build a responsive task list and creation form in React with envguard-frontend",
+        "Add loading, error, and empty states to our data-fetching components",
+        "Write component tests with React Testing Library verifying task completion toggles"
+      ]
+    }
+  },
+  {
+    "name": "envguard-fullstack-integration",
+    "pack": "fullstack",
+    "description": "Guides end-to-end full-stack integration connecting React frontends, Node.js APIs, and database persistence with shared TypeScript contracts, CORS configuration, environment boundary enforcement, and integration testing.",
+    "canonicalDir": "packs/fullstack/skills/envguard-fullstack-integration",
+    "version": "1.0.0",
+    "supportedHosts": ["codex", "antigravity", "claude-code", "cursor"],
+    "requiredTools": ["read_file", "write_file", "run_command"],
+    "requiredPermissions": ["workspace-write"],
+    "triggers": {
+      "when": [
+        "Connecting a frontend application to a backend API service",
+        "Aligning TypeScript contracts, interfaces, and request/response shapes across client and server",
+        "Configuring Cross-Origin Resource Sharing (CORS), session cookies, and authentication headers"
+      ],
+      "whenNot": [
+        "Writing isolated UI styling without API integration",
+        "Writing raw SQL migration scripts without application integration"
+      ],
+      "suggestedPrompts": [
+        "Integrate our React frontend with our Express backend and database using envguard-fullstack-integration",
+        "Set up shared TypeScript contracts and secure CORS between client and server",
+        "Build an end-to-end integration test verifying task creation from UI to database"
+      ]
+    }
   }
 ]
 
