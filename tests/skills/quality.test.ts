@@ -6,6 +6,7 @@ import {
   loadPacks,
   verifySkills,
   parseFrontmatter,
+  syncSkills,
 } from '../../tools/skill-manager.mjs';
 
 describe('Skill Quality & Catalog Verification', () => {
@@ -112,5 +113,44 @@ describe('Skill Quality & Catalog Verification', () => {
       expect(content).not.toMatch(/sk_live_[A-Za-z0-9_]{20,}/);
     }
   });
-});
 
+  it('parses complex frontmatter with multiline folded strings and colons correctly', () => {
+    const testYaml = `---
+name: envguard-test-complex
+description: >
+  This is a multiline description that spans across several lines
+  and contains: colons, "quotes", and complex formatting.
+tags:
+  - security
+  - configuration
+---
+
+# Test Body
+`;
+    const parsed = parseFrontmatter(testYaml);
+    expect(parsed).not.toBeNull();
+    expect(parsed?.frontmatter.name).toBe('envguard-test-complex');
+    expect(parsed?.frontmatter.description).toContain('contains: colons, "quotes"');
+    expect(parsed?.frontmatter.tags).toEqual(['security', 'configuration']);
+    expect(parsed?.body).toBe('# Test Body');
+  });
+
+  it('detects and throws informative errors on invalid YAML frontmatter syntax', () => {
+    const invalidYaml = `---
+name: envguard-broken
+description: [unclosed array
+---
+
+# Broken Body
+`;
+    expect(() => {
+      parseFrontmatter(invalidYaml);
+    }).toThrow(/YAML frontmatter syntax error/);
+  });
+
+  it('verifies that syncSkills in checkOnly mode succeeds on synchronized repository', () => {
+    const res = syncSkills({ repoRoot: rootDir, checkOnly: true });
+    expect(res.valid).toBe(true);
+    expect(res.issues).toEqual([]);
+  });
+});
