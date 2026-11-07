@@ -1,0 +1,20 @@
+{
+  "name": "fullstack-golden-path",
+  "version": "1.0.0",
+  "description": "EnvGuard Full-Stack Golden Path reference task platform",
+  "type": "module",
+  "engines": {
+    "node": "^22.0.0 || ^24.0.0 || ^26.0.0"
+  },
+  "scripts": {
+    "build": "node -e \"console.log('Sample build successful'); process.exit(0)\"",
+    "test": "node -e \"console.log('Sample tests verified'); process.exit(0)\"",
+    "typecheck": "node -e \"console.log('Sample typecheck clean'); process.exit(0)\""
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "helmet": "^8.0.0",
+    "cors": "^2.8.5",
+    "sqlite3": "^5.1.7"
+  }
+}

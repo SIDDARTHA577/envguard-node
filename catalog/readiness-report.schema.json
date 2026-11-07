@@ -1,0 +1,145 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "EnvGuard Production Readiness Report Schema",
+  "version": "1.0.0",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "toolVersion",
+    "timestamp",
+    "projectRoot",
+    "platform",
+    "configuration",
+    "summary",
+    "findings",
+    "limitations"
+  ],
+  "properties": {
+    "schemaVersion": { "type": "string", "enum": ["1.0.0"] },
+    "toolVersion": { "type": "string" },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "projectRoot": { "type": "string" },
+    "gitCommit": { "type": "string" },
+    "platform": {
+      "type": "object",
+      "required": ["nodeVersion", "os", "arch"],
+      "properties": {
+        "nodeVersion": { "type": "string" },
+        "os": { "type": "string" },
+        "arch": { "type": "string" }
+      }
+    },
+    "configuration": {
+      "type": "object",
+      "required": ["allowExec", "timeoutMs", "categories"],
+      "properties": {
+        "allowExec": { "type": "boolean" },
+        "timeoutMs": { "type": "integer", "minimum": 100 },
+        "categories": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "projectMetadata": {
+      "type": "object"
+    },
+    "summary": {
+      "type": "object",
+      "required": [
+        "totalChecks",
+        "pass",
+        "fail",
+        "warning",
+        "notRun",
+        "manualReview",
+        "notApplicable",
+        "error"
+      ],
+      "properties": {
+        "totalChecks": { "type": "integer", "minimum": 0 },
+        "pass": { "type": "integer", "minimum": 0 },
+        "fail": { "type": "integer", "minimum": 0 },
+        "warning": { "type": "integer", "minimum": 0 },
+        "notRun": { "type": "integer", "minimum": 0 },
+        "manualReview": { "type": "integer", "minimum": 0 },
+        "notApplicable": { "type": "integer", "minimum": 0 },
+        "error": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "category",
+          "status",
+          "title",
+          "explanation",
+          "checkMethod",
+          "recommendation",
+          "manualVerificationRequired",
+          "confidence"
+        ],
+        "properties": {
+          "id": { "type": "string" },
+          "category": { "type": "string" },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PASS",
+              "FAIL",
+              "WARNING",
+              "NOT_RUN",
+              "MANUAL_REVIEW",
+              "NOT_APPLICABLE",
+              "ERROR"
+            ]
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["critical", "high", "medium", "low", "info"]
+          },
+          "title": { "type": "string" },
+          "explanation": { "type": "string" },
+          "evidence": {
+            "type": "object",
+            "properties": {
+              "file": { "type": "string" },
+              "line": { "type": "integer" },
+              "snippet": { "type": "string" },
+              "command": { "type": "string" },
+              "exitCode": { "type": "integer" },
+              "durationMs": { "type": "integer" }
+            }
+          },
+          "checkMethod": {
+            "type": "string",
+            "enum": [
+              "static_analysis",
+              "command_execution",
+              "heuristic",
+              "manual_verification_required"
+            ]
+          },
+          "recommendation": { "type": "string" },
+          "manualVerificationRequired": { "type": "boolean" },
+          "confidence": {
+            "type": "string",
+            "enum": [
+              "verified_fact",
+              "high_heuristic",
+              "medium_heuristic",
+              "unverified"
+            ]
+          }
+        }
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}

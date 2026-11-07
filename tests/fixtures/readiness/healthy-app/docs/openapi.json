@@ -1,0 +1,31 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Healthy App API",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/v1/tasks": {
+      "get": {
+        "summary": "List tasks",
+        "responses": {
+          "200": { "description": "OK" },
+          "400": { "$ref": "#/components/schemas/ProblemDetails" }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ProblemDetails": {
+        "type": "object",
+        "required": ["type", "title", "status"],
+        "properties": {
+          "type": { "type": "string" },
+          "title": { "type": "string" },
+          "status": { "type": "integer" }
+        }
+      }
+    }
+  }
+}
