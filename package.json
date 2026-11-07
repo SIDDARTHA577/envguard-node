@@ -53,7 +53,11 @@
     "test:coverage": "vitest run --coverage",
     "test:pack": "npm pack && node scripts/test-tarball.mjs",
     "lint": "eslint src/ tests/",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "skills:list": "node tools/skill-manager.mjs list",
+    "skills:sync": "node tools/skill-manager.mjs sync",
+    "skills:verify": "node tools/skill-manager.mjs verify",
+    "skills:install": "node tools/skill-manager.mjs install"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

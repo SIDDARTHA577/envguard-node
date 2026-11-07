@@ -1,0 +1,133 @@
+[
+  {
+    "name": "envguard-audit",
+    "pack": "core",
+    "description": "Scans a codebase for environment variable usage (e.g. process.env, import.meta.env), identifies required configuration keys, and recommends a type-safe EnvGuard schema and safe .env.example without exposing secret values.",
+    "canonicalDir": "skills/envguard-audit",
+    "version": "1.0.0",
+    "supportedHosts": ["codex", "antigravity", "claude-code", "cursor"],
+    "requiredTools": ["read_file", "run_command"],
+    "requiredPermissions": ["read-only"],
+    "triggers": {
+      "when": [
+        "User asks to inspect or audit environment variable usage in a project",
+        "User asks what environment variables an application requires",
+        "User requests generating an .env.example template from existing source code"
+      ],
+      "whenNot": [
+        "User is asking to modify or rewrite production code without an audit phase",
+        "Project does not use environment variables"
+      ],
+      "suggestedPrompts": [
+        "Audit this project's environment variables with envguard-audit",
+        "Inspect all process.env calls and suggest an EnvGuard schema",
+        "Generate a safe .env.example template for this repository"
+      ]
+    }
+  },
+  {
+    "name": "envguard-setup",
+    "pack": "core",
+    "description": "Guides the installation and configuration of EnvGuard in a Node.js/TypeScript project, generating appropriate schema files, .env.example, and startup validation checks tailored to the project's package manager.",
+    "canonicalDir": "skills/envguard-setup",
+    "version": "1.0.0",
+    "supportedHosts": ["codex", "antigravity", "claude-code", "cursor"],
+    "requiredTools": ["read_file", "write_file", "run_command"],
+    "requiredPermissions": ["workspace-write"],
+    "triggers": {
+      "when": [
+        "User asks to install or set up EnvGuard in a project",
+        "User wants to configure startup environment validation",
+        "Project needs initial envguard.config.ts or envguard.config.json setup"
+      ],
+      "whenNot": [
+        "EnvGuard is already fully configured and validated in the project",
+        "User is seeking a security audit only without installing packages"
+      ],
+      "suggestedPrompts": [
+        "Configure startup environment validation with envguard-setup",
+        "Install and set up EnvGuard in this project",
+        "Initialize envguard.config.ts and fail-fast startup checks"
+      ]
+    }
+  },
+  {
+    "name": "envguard-review",
+    "pack": "core",
+    "description": "Reviews environment variable and secret handling in a project for common security vulnerabilities (e.g. unvalidated variables, console.log leaks, missing .gitignore rules, and unmasked error outputs).",
+    "canonicalDir": "skills/envguard-review",
+    "version": "1.0.0",
+    "supportedHosts": ["codex", "antigravity", "claude-code", "cursor"],
+    "requiredTools": ["read_file", "run_command"],
+    "requiredPermissions": ["read-only"],
+    "triggers": {
+      "when": [
+        "User requests a security review of environment configuration",
+        "User asks to check if secrets might be leaked in logs or commits",
+        "User asks to verify .gitignore and .dockerignore for secret exclusions"
+      ],
+      "whenNot": [
+        "User wants full penetration testing or network exploit analysis",
+        "User only wants to generate a new schema"
+      ],
+      "suggestedPrompts": [
+        "Review my environment variable security and .gitignore with envguard-review",
+        "Check this project for potential secret leakage in logs or error handling",
+        "Verify environment configuration security before deployment"
+      ]
+    }
+  },
+  {
+    "name": "envguard-ci",
+    "pack": "core",
+    "description": "Integrates EnvGuard validation checks into CI/CD pipelines (GitHub Actions, GitLab CI, Docker entrypoints) to catch configuration drift and missing deployment secrets before shipping code.",
+    "canonicalDir": "skills/envguard-ci",
+    "version": "1.0.0",
+    "supportedHosts": ["codex", "antigravity", "claude-code", "cursor"],
+    "requiredTools": ["read_file", "write_file"],
+    "requiredPermissions": ["workspace-write"],
+    "triggers": {
+      "when": [
+        "User asks to integrate environment checks into GitHub Actions or GitLab CI",
+        "User wants pre-flight validation in Docker containers before starting Node.js",
+        "User wants to prevent configuration drift between environments in CI"
+      ],
+      "whenNot": [
+        "User has no CI/CD pipeline and does not want one configured",
+        "User is troubleshooting local application business logic"
+      ],
+      "suggestedPrompts": [
+        "Integrate EnvGuard into CI/CD workflows with envguard-ci",
+        "Add an environment validation step to GitHub Actions",
+        "Configure Docker pre-flight check with envguard"
+      ]
+    }
+  },
+  {
+    "name": "envguard-migrate",
+    "pack": "core",
+    "description": "Guides the safe, step-by-step migration of an existing Node.js codebase from raw process.env or ad-hoc validation (dotenv, joi, envalid) to EnvGuard with zero regressions.",
+    "canonicalDir": "skills/envguard-migrate",
+    "version": "1.0.0",
+    "supportedHosts": ["codex", "antigravity", "claude-code", "cursor"],
+    "requiredTools": ["read_file", "write_file", "run_command"],
+    "requiredPermissions": ["workspace-write"],
+    "triggers": {
+      "when": [
+        "User wants to migrate an existing app from dotenv, envalid, or joi to EnvGuard",
+        "User wants to refactor raw process.env references into a typed config object",
+        "User wants zero-regression configuration modernization"
+      ],
+      "whenNot": [
+        "Project is completely greenfield with no existing code to migrate",
+        "User is not ready to refactor environment access"
+      ],
+      "suggestedPrompts": [
+        "Migrate raw process.env references to EnvGuard with envguard-migrate",
+        "Replace envalid with EnvGuard with zero regressions",
+        "Safely transition our dotenv configuration to EnvGuard"
+      ]
+    }
+  }
+]
+

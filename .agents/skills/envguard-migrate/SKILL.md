@@ -5,54 +5,88 @@ description: Guides the safe, step-by-step migration of an existing Node.js code
 
 # `envguard-migrate` Skill
 
-Use this skill when transitioning an existing project to EnvGuard from raw `process.env` lookups or legacy configuration libraries.
+Guides the safe, incremental migration of an existing codebase from raw `process.env` lookups or legacy configuration libraries (`dotenv`, `envalid`, `joi`) to EnvGuard with zero regressions.
 
-## Migration Principles
+## When to Trigger
+- The user asks to migrate an application from `dotenv`, `envalid`, or `joi` to EnvGuard.
+- The user wants to replace scattered, untyped `process.env` references with a centralized, type-safe configuration object.
+- Modernizing configuration validation in an established codebase.
 
-1. **Zero Downtime / Zero Regressions**:
-   - Preserve all existing variable names and existing default fallbacks.
-2. **Propose Plan First**:
-   - Present a clear diff and file checklist before modifying code.
-3. **Step-by-Step Validation**:
-   - Run tests after each file change to guarantee application behavior remains identical.
+## When NOT to Trigger
+- Greenfield projects with no existing code to migrate (use `envguard-setup`).
+- Conducting an initial static discovery scan without modifying files (use `envguard-audit`).
+- User only wants a security review of current practices (use `envguard-review`).
 
----
+## Supported Projects & Environments
+- Node.js applications with existing `dotenv`, `envalid`, `joi`, or raw `process.env` usage.
+- TypeScript and JavaScript codebases.
+- Monorepos and single-package projects.
 
-## Migration Steps
+## Required Tools & Permissions
+- Tools: Grep / search, file reader, file writer, test runner (`read_file`, `write_file`, `run_command`).
+- Permissions: Project workspace read and write permissions to update configuration and source files.
 
-### Step 1: Inventory Existing Configuration
-Identify all environment variables currently in use:
-```bash
-# Search for environment reads across src/
-grep -rn "process.env" src/
-```
+## Expected Inputs
+- Project source code directory.
+- Existing environment initialization files (`.env`, `dotenv.config()`, `cleanEnv(...)`).
 
-### Step 2: Build the EnvGuard Schema
-Create a centralized `src/config/env.ts` (or `envguard.config.json`):
-```typescript
-import { guard, s } from 'envguard-node';
+## Step-by-Step Workflow
 
-export const env = guard({
-  PORT: s.port().default(3000),
-  DATABASE_URL: s.url().sensitive(),
-  NODE_ENV: s.enum(['development', 'production', 'test']).default('development'),
-}).data;
-```
+### Step 1: Inventory Existing Configuration & Fallbacks
+- Locate all direct `process.env` calls across the codebase:
+  ```bash
+  grep -rn "process.env" src/
+  ```
+- Note default fallback values (e.g. `process.env.PORT || 3000`) and parse types.
 
-### Step 3: Replace Direct `process.env` Reads
-Update application files to import the validated, typed `env` object:
-```typescript
-// Before:
-const port = parseInt(process.env.PORT || '3000', 10);
+### Step 2: Create Centralized EnvGuard Schema
+- Build a dedicated typed config file (e.g. `src/config/env.ts`):
+  ```typescript
+  import { guard, s } from 'envguard-node';
 
-// After:
-import { env } from './config/env.js';
-const port = env.PORT; // strictly typed as number
-```
+  const result = guard({
+    PORT: s.port().default(3000),
+    DATABASE_URL: s.url().sensitive(),
+    NODE_ENV: s.enum(['development', 'production', 'test']).default('development'),
+  }, process.env, { throwOnError: true });
 
-### Step 4: Verify Tests
-Run the project's test suite:
-```bash
-npm test
-```
+  export const env = result.data;
+  ```
 
+### Step 3: Incrementally Refactor Source Files
+- Replace direct `process.env.VAR` reads with `env.VAR` imports file-by-file:
+  ```typescript
+  // Before:
+  const port = parseInt(process.env.PORT || '3000', 10);
+
+  // After:
+  import { env } from './config/env.js';
+  const port = env.PORT; // type: number
+  ```
+
+### Step 4: Remove Deprecated Dependencies
+- Once all references are migrated, remove legacy dependencies (`envalid`, `dotenv`) if no longer needed.
+- Update `package.json` and lockfile.
+
+## Validation Steps
+- Run the project test suite (`npm test`) after each file modification to guarantee zero behavioral regressions.
+- Execute type checking (`npm run typecheck` or `npx tsc --noEmit`) to verify strict type alignment.
+
+## Expected Outputs
+- Centralized `src/config/env.ts` (or `env.js`).
+- Refactored source files using the typed `env` export.
+- Clean test run demonstrating zero regressions.
+
+## Failure Handling
+- If tests fail after a file modification, revert that file immediately and investigate fallback mismatches.
+- If existing runtime behavior relies on unvalidated dynamic keys, document the exception and preserve compatibility.
+
+## Safety & Privacy Boundaries
+- **NEVER** alter existing variable names or default fallback semantics without explicit approval.
+- **NEVER** commit or expose real secrets during migration.
+- Always verify all unit tests pass before committing changes.
+
+## Example User Prompts
+- "Migrate raw process.env references to EnvGuard with envguard-migrate"
+- "Replace envalid with EnvGuard with zero regressions"
+- "Safely transition our dotenv configuration to EnvGuard"

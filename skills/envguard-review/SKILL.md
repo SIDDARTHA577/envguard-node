@@ -5,37 +5,68 @@ description: Reviews environment variable and secret handling in a project for c
 
 # `envguard-review` Skill
 
-Use this skill to conduct a focused security review of how environment configuration is managed and handled within an application.
+Conducts a security-focused review of environment variable management, secret handling, accidental leakage vectors, and configuration hygiene.
 
-## Security Scope & Limitations
+## When to Trigger
+- The user requests a security review of secrets or environment configuration.
+- Checking for accidental credential leakage in log statements, error handlers, or git tracking.
+- Pre-deployment security verification of `.gitignore`, `.dockerignore`, and schema definitions.
 
-> [!NOTE]
-> This review focuses on configuration hygiene, secret redaction, and environment validation. It does **not** replace a comprehensive third-party application penetration test or SOC2 compliance audit.
+## When NOT to Trigger
+- Penetration testing or active network exploitation of running services.
+- General application business logic code reviews unrelated to secrets or configuration.
+- Generating schemas from scratch without prior code audit (use `envguard-audit`).
 
----
+## Supported Projects & Environments
+- Any Node.js, TypeScript, or JavaScript application.
+- Containerized workflows (Docker, Docker Compose).
+- Serverless and cloud-native Node.js deployments.
 
-## Review Checklist
+## Required Tools & Permissions
+- Tools: Grep / file search, file reader (`read_file`, `run_command`).
+- Permissions: Read-only access to repository source and configuration files.
 
-### 1. `.gitignore` & `.dockerignore` Integrity
-- Ensure `.env`, `.env.*` (except `.env.example`), `*.pem`, `*.key`, and `*.local` are explicitly ignored.
-- In Docker projects, ensure `.dockerignore` prevents accidental inclusion of local secret files into image layers.
+## Expected Inputs
+- Repository source code directory.
+- Configuration and ignore files (`.gitignore`, `.dockerignore`, Dockerfiles, CI workflows).
 
-### 2. Leaky Logging & Assertion Inspection
-- Search for dangerous logging calls such as `console.log(process.env)`, `logger.info(req.body)`, or custom exception classes echoing raw environment variables.
-- Ensure all variable validation errors leverage EnvGuard's zero-secret-leakage architecture.
+## Step-by-Step Workflow
 
-### 3. Startup Fail-Fast Validation
-- Verify that required secrets (e.g. database URLs, JWT signing keys, payment gateway tokens) are validated at boot time rather than accessed lazily during HTTP request processing.
+### Step 1: Verify Git & Container Ignore Rules
+- Verify `.gitignore` explicitly excludes `.env`, `.env.*` (except `.env.example`), `*.pem`, `*.key`, and `*.local`.
+- If Docker is used, verify `.dockerignore` exists and excludes secret and local environment files.
 
-### 4. Classification & Sensitivity
-- Check whether secrets are explicitly tagged with `.sensitive()` in the EnvGuard schema for documentation and auditing purposes.
+### Step 2: Search for Sensitive Value Leaks
+- Search for dangerous logging patterns: `console.log(process.env)`, `logger.info(req.body)`, or custom logs echoing configuration.
+- Check exception classes and error handlers to ensure failed validations do not print secret values.
 
----
+### Step 3: Verify Startup Validation Coverage
+- Inspect entry points to confirm required credentials (database URLs, API tokens, JWT keys) are validated at boot time.
+- Verify that missing required variables halt startup immediately rather than causing runtime crashes later.
 
-## Reporting Findings
+### Step 4: Validate Sensitivity Tags
+- Verify that all credentials, passwords, and private tokens in EnvGuard schemas use `.sensitive()` to ensure redaction.
 
-Categorize all findings into:
-1. **Critical Vulnerabilities**: e.g. committed `.env` files with real keys, unmasked console logging of secrets.
-2. **Missing Hardening**: e.g. optional variables lacking defaults, unconstrained port numbers.
-3. **Recommended Improvements**: e.g. adding `.dockerignore`, adding protocol validation to connection strings.
+## Validation Steps
+- Verify `.git` status to ensure no tracked `.env` files are accidentally committed in git history.
+- Run `git ls-files | grep '\.env$'` or similar to confirm clean repository tracking.
 
+## Expected Outputs
+- A categorized security report:
+  1. **Critical Vulnerabilities**: e.g. committed secret files, unmasked logging of credentials.
+  2. **Security Hardening Needs**: e.g. unconstrained port types, unvalidated URLs, missing `.dockerignore`.
+  3. **Best Practice Recommendations**: e.g. marking fields `.sensitive()`, adding CI schema drift checks.
+
+## Failure Handling
+- If git history cannot be inspected, clearly note the limitation in the final report.
+- Clearly distinguish verified vulnerabilities from unverified static pattern warnings.
+
+## Safety & Privacy Boundaries
+- **NEVER** display or print actual secrets discovered during review.
+- **NEVER** transmit repository findings to external endpoints.
+- Do not make exaggerated security claims (e.g. "100% secure" or "guaranteed unhackable").
+
+## Example User Prompts
+- "Review my environment variable security and .gitignore with envguard-review"
+- "Check this project for potential secret leakage in logs or error handling"
+- "Verify environment configuration security before deployment"

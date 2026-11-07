@@ -1,0 +1,69 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "EnvGuard Skill Catalog Schema",
+  "definitions": {
+    "pack": {
+      "type": "object",
+      "required": ["id", "name", "description", "skills"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "skills": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "skill": {
+      "type": "object",
+      "required": [
+        "name",
+        "pack",
+        "description",
+        "canonicalDir",
+        "version",
+        "supportedHosts",
+        "triggers"
+      ],
+      "properties": {
+        "name": { "type": "string", "pattern": "^envguard-[a-z0-9-]+$" },
+        "pack": { "type": "string" },
+        "description": { "type": "string" },
+        "canonicalDir": { "type": "string" },
+        "version": { "type": "string" },
+        "supportedHosts": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "requiredTools": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "requiredPermissions": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "triggers": {
+          "type": "object",
+          "required": ["when", "whenNot", "suggestedPrompts"],
+          "properties": {
+            "when": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "whenNot": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "suggestedPrompts": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
