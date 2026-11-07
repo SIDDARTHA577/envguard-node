@@ -258,6 +258,114 @@
         "Build an end-to-end integration test verifying task creation from UI to database"
       ]
     }
+  },
+  {
+    "name": "envguard-ui-design",
+    "pack": "fullstack",
+    "description": "Guides the design and implementation of cohesive, token-driven user interfaces with standardized typography, spacing scales, responsive layout grids, component anatomy, and design system consistency.",
+    "canonicalDir": "packs/fullstack/skills/envguard-ui-design",
+    "version": "1.0.0",
+    "supportedHosts": ["codex", "antigravity", "claude-code", "cursor"],
+    "requiredTools": ["read_file", "write_file", "run_command"],
+    "requiredPermissions": ["workspace-write"],
+    "triggers": {
+      "when": [
+        "Defining, auditing, or refactoring design tokens and theme configuration",
+        "Building responsive grid layouts, breakpoints, or component styling",
+        "Standardizing component anatomy, empty states, and visual design consistency"
+      ],
+      "whenNot": [
+        "Writing backend Express routes or SQL database queries",
+        "Auditing environment secrets or deployment keys",
+        "Performing deep WCAG screen reader compliance audits"
+      ],
+      "suggestedPrompts": [
+        "Standardize our design tokens and color palette with envguard-ui-design",
+        "Create a responsive dashboard layout with metric cards and a data table using our design system",
+        "Audit our components for consistent spacing, typography scale, and dark mode support"
+      ]
+    }
+  },
+  {
+    "name": "envguard-api-design",
+    "pack": "fullstack",
+    "description": "Guides the specification and design of standardized RESTful APIs with OpenAPI 3.1 contracts, explicit HTTP semantics, RFC 7807 structured error responses, pagination, filtering, and backward compatibility.",
+    "canonicalDir": "packs/fullstack/skills/envguard-api-design",
+    "version": "1.0.0",
+    "supportedHosts": ["codex", "antigravity", "claude-code", "cursor"],
+    "requiredTools": ["read_file", "write_file", "run_command"],
+    "requiredPermissions": ["workspace-write"],
+    "triggers": {
+      "when": [
+        "Designing or documenting RESTful API endpoints, request schemas, and responses",
+        "Creating or updating OpenAPI 3.x specifications or JSON schema contracts",
+        "Standardizing HTTP status codes, RFC 7807 problem details, pagination, or filtering"
+      ],
+      "whenNot": [
+        "Writing low-level database SQL queries or migrations",
+        "Designing frontend CSS layouts or React JSX components",
+        "Configuring CI/CD pipelines or container orchestration"
+      ],
+      "suggestedPrompts": [
+        "Design a RESTful API contract for our task management service with envguard-api-design",
+        "Generate an OpenAPI 3.1 specification for our user and organization endpoints",
+        "Standardize error handling and pagination across all backend routes to RFC 7807"
+      ]
+    }
+  },
+  {
+    "name": "envguard-code-review",
+    "pack": "fullstack",
+    "description": "Conducts rigorous, evidence-based code reviews evaluating correctness, edge cases, performance bottlenecks, architectural alignment, test adequacy, security best practices, and breaking changes.",
+    "canonicalDir": "packs/fullstack/skills/envguard-code-review",
+    "version": "1.0.0",
+    "supportedHosts": ["codex", "antigravity", "claude-code", "cursor"],
+    "requiredTools": ["read_file", "run_command"],
+    "requiredPermissions": ["read-only"],
+    "triggers": {
+      "when": [
+        "Reviewing pull requests, git diffs, or newly implemented files before merging",
+        "Evaluating code changes for logical bugs, edge cases, memory leaks, or race conditions",
+        "Auditing automated test adequacy and checking for potential breaking API changes"
+      ],
+      "whenNot": [
+        "Drafting initial system architecture from scratch without code",
+        "Automated stylistic formatting or lint fixing without review",
+        "Auditing environment configuration secrets exclusively"
+      ],
+      "suggestedPrompts": [
+        "Perform a rigorous code review of pull request #12 with envguard-code-review",
+        "Review our new transaction processing service for race conditions, error handling, and memory leaks",
+        "Audit these recent TypeScript changes for potential breaking API changes and test coverage gaps"
+      ]
+    }
+  },
+  {
+    "name": "envguard-accessibility",
+    "pack": "fullstack",
+    "description": "Guides auditing and implementation of accessible web interfaces aligned with WCAG 2.1/2.2 AA standards, semantic HTML, keyboard navigation, focus management, color contrast, and ARIA patterns.",
+    "canonicalDir": "packs/fullstack/skills/envguard-accessibility",
+    "version": "1.0.0",
+    "supportedHosts": ["codex", "antigravity", "claude-code", "cursor"],
+    "requiredTools": ["read_file", "write_file", "run_command"],
+    "requiredPermissions": ["workspace-write"],
+    "triggers": {
+      "when": [
+        "Auditing web applications or React components for WCAG 2.1/2.2 AA compliance",
+        "Implementing or verifying keyboard navigation, tab order, focus traps, and focus rings",
+        "Checking color contrast ratios, form labels, aria-describedby, and live announcements"
+      ],
+      "whenNot": [
+        "Designing high-level backend architecture or database schemas",
+        "Writing server-side Node.js business logic with no UI",
+        "Auditing environment secrets or deployment keys"
+      ],
+      "suggestedPrompts": [
+        "Audit our React task management components for WCAG 2.1 AA accessibility with envguard-accessibility",
+        "Implement a fully accessible modal dialog with keyboard focus trap and Escape key dismissal",
+        "Fix form accessibility by associating labels, adding aria-describedby for errors, and checking color contrast"
+      ]
+    }
   }
 ]
 
