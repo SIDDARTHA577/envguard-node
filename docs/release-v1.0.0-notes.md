@@ -7,18 +7,18 @@
 - **Release Baseline Commit SHA:** `5ea15dc4cb10caf8b5f68d859906115509c207e2`
 - **License:** MIT
 - **Supported Runtimes:** Node.js 22.x (Maintenance LTS), 24.x (Maintenance LTS), 26.x (Active LTS)
-- **Target Operating Systems:** Linux (Ubuntu - CI verified), Windows (Windows Server / Windows 11 - CI verified), macOS (Runtime compatible; not currently CI verified)
+- **Target Operating Systems:** Linux (Ubuntu - CI verified via ubuntu-latest), Windows (Windows Server - CI verified via windows-latest), macOS (Runtime compatible; not currently CI verified)
 
 ---
 
 ## 1. Overview & Purpose
 
-EnvGuard is a production-grade TypeScript library and command-line tool for runtime environment variable validation, secret leak prevention, and automated CI configuration drift detection.
+EnvGuard is a production-grade TypeScript library and command-line tool for runtime environment variable validation, secret leak mitigation, and automated CI configuration drift detection.
 
 Unlike bloated schema libraries or single-purpose dotenv parsers, EnvGuard delivers:
 - **Zero external runtime dependencies**: No third-party packages installed in production runtimes.
 - **Strict type coercion and fail-fast startup validation**: Stops misconfigured containers or serverless invocations before bad configurations reach production code.
-- **Zero-leak security architecture**: Automatic secret masking (`[REDACTED]`) across logs, console output, and JSON reports.
+- **Accidental secret exposure mitigation**: Automatic secret masking (`[REDACTED]`) across logs, console output, and JSON reports.
 - **Dual ESM & CommonJS distribution**: Seamless integration with modern ESM (`import`) and legacy CommonJS (`require()`) runtimes.
 - **First-class AI Agent Skills**: Turnkey skills for Claude Code, OpenAI Codex, Cursor, and Antigravity.
 
@@ -93,18 +93,18 @@ In strict alignment with the official Node.js Working Group release schedule as 
 - *Note: Node.js 18.x and Node.js 20.x have reached End-of-Life (EOL) and are not supported.*
 
 Operating system verification status:
-- Linux (Ubuntu 22.04 / 24.04 LTS runners): **CI verified**
-- Windows (Windows Server 2022 / Windows 11): **CI verified**
+- Linux (ubuntu-latest GitHub Actions runner): **CI verified**
+- Windows (windows-latest GitHub Actions runner): **CI verified**
 - macOS: **Runtime compatible; not currently CI verified**
 
 ---
 
 ## 4. Security Architecture & Design Guarantees
 
-- **No Secrets in Output**: Any field flagged `.sensitive()` or possessing sensitive naming heuristics (`SECRET`, `TOKEN`, `KEY`, `PASSWORD`, `AUTH`, `CREDENTIAL`) is redacted as `[REDACTED]`.
+- **Sensitive Value Redaction**: Any field flagged `.sensitive()` or possessing sensitive naming heuristics (`SECRET`, `TOKEN`, `KEY`, `PASSWORD`, `AUTH`, `CREDENTIAL`) is redacted as `[REDACTED]` in validation error output and JSON reports to mitigate accidental secret exposure.
 - **ReDoS Prevention**: Trailing comments are identified using a deterministic linear scan (`findTrailingCommentIndex`) rather than polynomial regex backtracking.
 - **Safe Object Assignment**: Internal configuration parsing uses `Object.defineProperty` and prototype-pollution-safe dictionary assignment.
-- **Zero Runtime Dependencies**: `dependencies` in `package.json` is completely empty (`{}`), eliminating transitive supply-chain attack vectors.
+- **Zero Runtime Dependencies**: `dependencies` in `package.json` is completely empty (`{}`), substantially reducing third-party dependency exposure in production runtimes, though developers must remain vigilant regarding devDependencies, build systems, and deployment infrastructure.
 
 ---
 
@@ -136,7 +136,7 @@ EnvGuard ships with 5 production-ready AI skills located in `.agents/skills/` (c
 - dotenv.config();
 - const port = Number(process.env.PORT) || 3000;
 + import { guard, s } from 'envguard-node';
-+ const result = guard({ PORT: s.port().default(3000) });
++ const result = guard({ PORT: s.port().default(3000) }, process.env, { throwOnError: true });
 + const port = result.data.PORT;
 ```
 
@@ -151,8 +151,18 @@ EnvGuard ships with 5 production-ready AI skills located in `.agents/skills/` (c
 + const result = guard({
 +   NODE_ENV: s.enum(['development', 'production']).default('development'),
 +   PORT: s.port().default(3000),
-+ });
++ }, process.env, { throwOnError: true });
 + export const env = result.data;
+```
+
+Alternatively, when handling validation results programmatically without throwing:
+```typescript
+const result = guard({ PORT: s.port().default(3000) });
+if (!result.success) {
+  console.error('Configuration errors:', result.errors);
+  process.exit(1);
+}
+const port = result.data.PORT;
 ```
 
 ---
