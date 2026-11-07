@@ -1,0 +1,19 @@
+{
+  "name": "@monorepo/api",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "express": "^4.19.0",
+    "helmet": "^7.1.0",
+    "cors": "^2.8.5",
+    "pg": "^8.11.0",
+    "@monorepo/shared": "1.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  }
+}

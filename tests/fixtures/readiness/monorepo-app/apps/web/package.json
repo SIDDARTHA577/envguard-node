@@ -1,0 +1,19 @@
+{
+  "name": "@monorepo/web",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "next build",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "next": "^14.2.0",
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0",
+    "@monorepo/shared": "1.0.0"
+  },
+  "devDependencies": {
+    "eslint-plugin-jsx-a11y": "^6.8.0",
+    "typescript": "^5.4.0"
+  }
+}

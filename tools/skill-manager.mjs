@@ -316,13 +316,7 @@ export function syncSkills({ repoRoot = REPO_ROOT, checkOnly = false } = {}) {
       if (fs.existsSync(subSrc) && fs.statSync(subSrc).isDirectory()) {
         const subDest = path.join(destDir, sub);
         if (!fs.existsSync(subDest)) fs.mkdirSync(subDest, { recursive: true });
-        for (const file of fs.readdirSync(subSrc)) {
-          const itemSrc = path.join(subSrc, file);
-          const itemDest = path.join(subDest, file);
-          if (fs.statSync(itemSrc).isFile()) {
-            fs.copyFileSync(itemSrc, itemDest);
-          }
-        }
+        fs.cpSync(subSrc, subDest, { recursive: true });
       }
     }
   }
