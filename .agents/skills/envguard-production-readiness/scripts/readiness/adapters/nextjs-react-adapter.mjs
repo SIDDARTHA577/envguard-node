@@ -509,14 +509,17 @@ export class NextJsReactAdapter extends BaseAdapter {
     // Check 9: NEXT-009 (Route Error Boundaries & Fallback UI)
     // =========================================================================
     const hasAppRouter = routerType === 'app_router';
-    const hasErrorBoundary =
+    const hasPagesRouter = routerType === 'pages_router';
+    const hasAppErrorBoundary =
       fs.existsSync(path.join(targetDir, 'app', 'error.tsx')) ||
       fs.existsSync(path.join(targetDir, 'app', 'error.jsx')) ||
-      fs.existsSync(path.join(targetDir, 'app', 'error.js')) ||
+      fs.existsSync(path.join(targetDir, 'app', 'error.js'));
+    const hasPagesErrorBoundary =
       fs.existsSync(path.join(targetDir, 'pages', '_error.tsx')) ||
-      fs.existsSync(path.join(targetDir, 'pages', '_error.jsx'));
+      fs.existsSync(path.join(targetDir, 'pages', '_error.jsx')) ||
+      fs.existsSync(path.join(targetDir, 'pages', '_error.js'));
 
-    if (hasErrorBoundary) {
+    if (hasAppErrorBoundary || (hasPagesRouter && hasPagesErrorBoundary)) {
       findings.push(
         this.createFinding({
           id: 'NEXT-009',
@@ -525,7 +528,7 @@ export class NextJsReactAdapter extends BaseAdapter {
           severity: 'info',
           title: 'Route Error Boundaries Configured',
           explanation: 'Found route-level error boundaries (error.tsx or _error.tsx) providing graceful crash recovery.',
-          evidence: { file: hasAppRouter ? 'app/error.tsx' : 'pages/_error.tsx' },
+          evidence: { file: hasAppErrorBoundary ? 'app/error.tsx' : 'pages/_error.tsx' },
           checkMethod: 'static_analysis',
           recommendation: 'Ensure error boundaries log contextual error digests for monitoring without exposing stack traces.',
           manualVerificationRequired: false,
@@ -550,23 +553,76 @@ export class NextJsReactAdapter extends BaseAdapter {
           targetPath: target.path,
         })
       );
-    } else {
+    } else if (hasPagesRouter) {
       findings.push(
         this.createFinding({
           id: 'NEXT-009',
           category: 'build_test',
-          status: 'PASS',
-          severity: 'info',
-          title: 'Standard React Component Architecture',
-          explanation: 'No missing route error boundaries detected for React target.',
-          evidence: { file: 'package.json' },
+          status: 'WARNING',
+          severity: 'low',
+          title: 'Missing Next.js Custom Error Page (pages/_error.tsx)',
+          explanation: 'Next.js Pages Router application lacks a custom _error.tsx page. Default Next.js error page will be rendered on uncaught errors.',
+          evidence: { file: 'pages/' },
           checkMethod: 'static_analysis',
-          recommendation: 'Wrap top-level views with an ErrorBoundary component.',
+          recommendation: 'Create pages/_error.tsx to handle server-side and client-side rendering exceptions gracefully.',
           manualVerificationRequired: false,
           confidence: 'verified_fact',
           targetPath: target.path,
         })
       );
+    } else {
+      let hasReactErrorBoundary = false;
+      for (const relFile of files) {
+        if (
+          (relFile.endsWith('.tsx') || relFile.endsWith('.jsx')) &&
+          !relFile.includes('.test.') &&
+          !relFile.includes('.spec.')
+        ) {
+          try {
+            const content = fs.readFileSync(path.join(projectDir, relFile), 'utf8');
+            if (content.includes('ErrorBoundary') || content.includes('componentDidCatch')) {
+              hasReactErrorBoundary = true;
+              break;
+            }
+          } catch {}
+        }
+      }
+
+      if (hasReactErrorBoundary) {
+        findings.push(
+          this.createFinding({
+            id: 'NEXT-009',
+            category: 'build_test',
+            status: 'PASS',
+            severity: 'info',
+            title: 'Top-Level React Error Boundary Configured',
+            explanation: 'Detected ErrorBoundary component wrapping view components for crash recovery.',
+            evidence: { file: 'src/' },
+            checkMethod: 'static_analysis',
+            recommendation: 'Ensure ErrorBoundary logs errors to centralized monitoring.',
+            manualVerificationRequired: false,
+            confidence: 'high_heuristic',
+            targetPath: target.path,
+          })
+        );
+      } else {
+        findings.push(
+          this.createFinding({
+            id: 'NEXT-009',
+            category: 'build_test',
+            status: 'WARNING',
+            severity: 'medium',
+            title: 'Missing Top-Level React Error Boundary',
+            explanation: 'React application does not declare an ErrorBoundary component. Uncaught component rendering errors will unmount the entire DOM tree.',
+            evidence: { file: 'package.json' },
+            checkMethod: 'static_analysis',
+            recommendation: 'Wrap root component tree with react-error-boundary or a custom class ErrorBoundary.',
+            manualVerificationRequired: false,
+            confidence: 'high_heuristic',
+            targetPath: target.path,
+          })
+        );
+      }
     }
 
     // =========================================================================

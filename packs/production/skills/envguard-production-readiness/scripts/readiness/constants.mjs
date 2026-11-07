@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 export const TOOL_VERSION = '1.0.0';
-export const REPORT_SCHEMA_VERSION = '1.0.0';
+export const REPORT_SCHEMA_VERSION = '1.1.0';
 
 export const EXIT_CODES = {
   SUCCESS: 0,
@@ -29,6 +29,7 @@ export const VALID_STATUSES = [
   'PASS',
   'FAIL',
   'WARNING',
+  'INFORMATIONAL',
   'NOT_RUN',
   'MANUAL_REVIEW',
   'NOT_APPLICABLE',

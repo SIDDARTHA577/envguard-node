@@ -2,9 +2,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { TOOL_VERSION, sanitizeOutput } from '../constants.mjs';
 
+const MAX_SARIF_FILE_SIZE = 20 * 1024 * 1024; // 20 MB
+const MAX_FINDINGS_LIMIT = 5000;
+
 /**
  * Imports and parses a SARIF (Static Analysis Results Interchange Format v2.1.0) report,
  * transforming external SAST, dependency, or secret scanner results into EnvGuard findings.
+ * Accurately interprets combinations of result.kind and result.level per OASIS SARIF v2.1.0.
  *
  * @param {string} sarifPath - File path to the SARIF JSON document
  * @param {object} context - Assessment context containing projectDir
@@ -38,6 +42,44 @@ export function importSarifReport(sarifPath, context = {}) {
     return findings;
   }
 
+  // Enforce file size limit
+  try {
+    const stat = fs.statSync(resolvedPath);
+    if (stat.size > MAX_SARIF_FILE_SIZE) {
+      findings.push({
+        id: 'SARIF-001',
+        adapterId: 'sarif-importer',
+        category: 'security',
+        status: 'ERROR',
+        severity: 'high',
+        title: 'SARIF Report File Exceeds Maximum Size Limit',
+        explanation: `SARIF file size (${(stat.size / (1024 * 1024)).toFixed(2)} MB) exceeds the maximum allowed limit of 20 MB.`,
+        evidence: { file: path.relative(projectDir, resolvedPath).replace(/\\/g, '/') },
+        checkMethod: 'static_analysis',
+        recommendation: 'Filter or split the static analysis report to reduce output size.',
+        manualVerificationRequired: false,
+        confidence: 'verified_fact',
+      });
+      return findings;
+    }
+  } catch (err) {
+    findings.push({
+      id: 'SARIF-001',
+      adapterId: 'sarif-importer',
+      category: 'security',
+      status: 'ERROR',
+      severity: 'high',
+      title: 'Failed to Access SARIF Report File',
+      explanation: `Could not inspect file stat for SARIF report: ${err.message}`,
+      evidence: { file: sarifPath },
+      checkMethod: 'static_analysis',
+      recommendation: 'Verify file permissions and accessibility of the SARIF file.',
+      manualVerificationRequired: false,
+      confidence: 'verified_fact',
+    });
+    return findings;
+  }
+
   let sarifData;
   try {
     const raw = fs.readFileSync(resolvedPath, 'utf8');
@@ -51,7 +93,7 @@ export function importSarifReport(sarifPath, context = {}) {
       severity: 'high',
       title: 'Malformed SARIF Report JSON',
       explanation: `Failed to parse SARIF report as valid JSON: ${err.message}`,
-      evidence: { file: path.relative(projectDir, resolvedPath) },
+      evidence: { file: path.relative(projectDir, resolvedPath).replace(/\\/g, '/') },
       checkMethod: 'static_analysis',
       recommendation: 'Ensure the SAST scanner emitted valid SARIF 2.1.0 output.',
       manualVerificationRequired: false,
@@ -60,16 +102,62 @@ export function importSarifReport(sarifPath, context = {}) {
     return findings;
   }
 
-  const runs = Array.isArray(sarifData?.runs) ? sarifData.runs : [];
+  if (!sarifData || typeof sarifData !== 'object' || Array.isArray(sarifData)) {
+    findings.push({
+      id: 'SARIF-001',
+      adapterId: 'sarif-importer',
+      category: 'security',
+      status: 'ERROR',
+      severity: 'high',
+      title: 'Invalid SARIF Root Structure',
+      explanation: 'Parsed SARIF document is not a valid JSON object.',
+      evidence: { file: path.relative(projectDir, resolvedPath).replace(/\\/g, '/') },
+      checkMethod: 'static_analysis',
+      recommendation: 'Ensure scanner emits a root SARIF JSON object containing a runs array.',
+      manualVerificationRequired: false,
+      confidence: 'verified_fact',
+    });
+    return findings;
+  }
+
+  const runs = Array.isArray(sarifData.runs) ? sarifData.runs : [];
   if (runs.length === 0) {
     return findings;
   }
 
-  for (const run of runs) {
+  for (let runIndex = 0; runIndex < runs.length; runIndex++) {
+    const run = runs[runIndex];
     const driver = run?.tool?.driver || {};
     const toolName = driver.name || 'Static Analysis Tool';
     const toolVersion = driver.version || TOOL_VERSION;
     const rulesMap = new Map();
+
+    // Check for tool execution failures in invocations
+    if (Array.isArray(run?.invocations)) {
+      for (let invIdx = 0; invIdx < run.invocations.length; invIdx++) {
+        const inv = run.invocations[invIdx];
+        if (inv && inv.executionSuccessful === false) {
+          findings.push({
+            id: `SARIF-INVOCATION-FAILURE#${runIndex}-${invIdx}`,
+            checkId: 'scanner-execution-failure',
+            adapterId: 'sarif-importer',
+            category: 'security',
+            status: 'ERROR',
+            severity: 'high',
+            title: `SARIF Scanner Invocation Failure (${toolName})`,
+            explanation: `External scanner "${toolName}" reported that execution was not successful. Analysis results may be incomplete or missing findings.`,
+            evidence: {
+              file: path.relative(projectDir, resolvedPath).replace(/\\/g, '/'),
+              snippet: sanitizeOutput(inv.toolExecutionNotifications?.[0]?.message?.text || 'executionSuccessful: false'),
+            },
+            checkMethod: 'static_analysis',
+            recommendation: 'Review scanner invocation logs and fix scanner configuration or execution environment.',
+            manualVerificationRequired: false,
+            confidence: 'verified_fact',
+          });
+        }
+      }
+    }
 
     if (Array.isArray(driver.rules)) {
       for (const rule of driver.rules) {
@@ -81,25 +169,81 @@ export function importSarifReport(sarifPath, context = {}) {
 
     const results = Array.isArray(run?.results) ? run.results : [];
 
-    for (const result of results) {
+    for (let resultIndex = 0; resultIndex < results.length; resultIndex++) {
+      if (findings.length >= MAX_FINDINGS_LIMIT) {
+        findings.push({
+          id: 'SARIF-MAX-FINDINGS-EXCEEDED',
+          checkId: 'max-findings-limit',
+          adapterId: 'sarif-importer',
+          category: 'security',
+          status: 'WARNING',
+          severity: 'medium',
+          title: 'SARIF Import Truncated (Max Findings Limit Reached)',
+          explanation: `Imported findings exceeded maximum limit of ${MAX_FINDINGS_LIMIT}. Remaining results were truncated.`,
+          evidence: { file: path.relative(projectDir, resolvedPath).replace(/\\/g, '/') },
+          checkMethod: 'static_analysis',
+          recommendation: 'Filter external scanner findings by severity or category to keep output actionable.',
+          manualVerificationRequired: false,
+          confidence: 'verified_fact',
+        });
+        return findings;
+      }
+
+      const result = results[resultIndex];
       const ruleId = result.ruleId || 'UNKNOWN_RULE';
       const ruleDef = rulesMap.get(ruleId) || {};
-      const level = result.level || ruleDef.defaultConfiguration?.level || 'warning';
 
-      // Determine status and severity
-      let status = 'WARNING';
-      let severity = 'medium';
+      // OASIS SARIF v2.1.0 §3.27.9 (kind) & §3.27.10 (level)
+      const rawKind = result.kind;
+      const level = result.level || ruleDef.defaultConfiguration?.level || (rawKind ? undefined : 'warning');
+      const kind = rawKind || (level === 'none' ? 'informational' : 'fail');
 
-      if (level === 'error') {
-        status = 'FAIL';
-        const securitySeverity = parseFloat(ruleDef.properties?.['security-severity'] || '0');
-        severity = securitySeverity >= 9.0 ? 'critical' : 'high';
-      } else if (level === 'warning') {
-        status = 'WARNING';
-        severity = 'medium';
-      } else if (level === 'note' || level === 'none') {
+      let status = 'INFORMATIONAL';
+      let severity = 'info';
+      let manualVerificationRequired = false;
+      let confidence = 'verified_fact';
+
+      if (kind === 'pass') {
         status = 'PASS';
         severity = 'info';
+      } else if (kind === 'notApplicable') {
+        status = 'NOT_APPLICABLE';
+        severity = 'info';
+      } else if (kind === 'review' || kind === 'open') {
+        status = 'MANUAL_REVIEW';
+        severity = 'medium';
+        manualVerificationRequired = true;
+        confidence = 'unverified';
+      } else if (kind === 'informational') {
+        status = 'INFORMATIONAL';
+        severity = 'info';
+      } else if (kind === 'fail') {
+        if (level === 'error') {
+          status = 'FAIL';
+          const securitySeverity = parseFloat(ruleDef.properties?.['security-severity'] || '0');
+          severity = securitySeverity >= 9.0 ? 'critical' : 'high';
+        } else if (level === 'warning') {
+          status = 'WARNING';
+          severity = 'medium';
+        } else if (level === 'note' || level === 'none') {
+          status = 'INFORMATIONAL';
+          severity = 'info';
+        } else {
+          status = 'WARNING';
+          severity = 'medium';
+        }
+      } else {
+        // Fallback for custom or unrecognized kind
+        if (level === 'error') {
+          status = 'FAIL';
+          severity = 'high';
+        } else if (level === 'warning') {
+          status = 'WARNING';
+          severity = 'medium';
+        } else {
+          status = 'INFORMATIONAL';
+          severity = 'info';
+        }
       }
 
       // Determine category
@@ -117,37 +261,65 @@ export function importSarifReport(sarifPath, context = {}) {
         category = 'performance';
       }
 
-      // Extract file location
+      // Extract and sanitize file location
       let relFile = 'unknown';
       let startLine = undefined;
       let snippet = undefined;
 
       const firstLoc = result.locations?.[0]?.physicalLocation;
       if (firstLoc?.artifactLocation?.uri) {
-        let uri = firstLoc.artifactLocation.uri;
+        let uri = String(firstLoc.artifactLocation.uri).trim();
         if (uri.startsWith('file://')) {
           uri = uri.replace(/^file:\/\//, '');
         }
-        relFile = path.isAbsolute(uri) ? path.relative(projectDir, uri).replace(/\\/g, '/') : uri.replace(/\\/g, '/');
+        if (uri.includes('\0')) {
+          uri = 'invalid-path';
+        }
+        if (/^https?:\/\//i.test(uri)) {
+          relFile = uri;
+        } else {
+          const resolvedUri = path.isAbsolute(uri) ? uri : path.resolve(projectDir, uri);
+          const relativeToProject = path.relative(projectDir, resolvedUri).replace(/\\/g, '/');
+          if (relativeToProject.startsWith('..') || path.isAbsolute(relativeToProject)) {
+            relFile = path.basename(uri);
+          } else {
+            relFile = relativeToProject;
+          }
+        }
       }
 
-      if (firstLoc?.region?.startLine) {
+      if (typeof firstLoc?.region?.startLine === 'number' && firstLoc.region.startLine > 0) {
         startLine = firstLoc.region.startLine;
       }
-      if (firstLoc?.region?.snippet?.text) {
-        snippet = sanitizeOutput(firstLoc.region.snippet.text.trim());
+      if (firstLoc?.region?.snippet?.text && typeof firstLoc.region.snippet.text === 'string') {
+        const rawSnippet = firstLoc.region.snippet.text.slice(0, 500).trim();
+        snippet = sanitizeOutput(rawSnippet);
       }
 
-      const title = ruleDef.shortDescription?.text || ruleDef.name || `Static Analysis Finding: ${ruleId}`;
-      const explanation = sanitizeOutput(result.message?.text || ruleDef.fullDescription?.text || 'No description provided.');
-      const recommendation = ruleDef.help?.text || `Review and remediate finding flagged by ${toolName}.`;
+      const rawTitle = ruleDef.shortDescription?.text || ruleDef.name || `Static Analysis Finding: ${ruleId}`;
+      const title = sanitizeOutput(String(rawTitle).slice(0, 200));
+
+      const rawExplanation = result.message?.text || ruleDef.fullDescription?.text || 'No description provided.';
+      const explanation = sanitizeOutput(String(rawExplanation).slice(0, 1000));
+
+      const rawRecommendation = ruleDef.help?.text || `Review and remediate finding flagged by ${toolName}.`;
+      const recommendation = sanitizeOutput(String(rawRecommendation).slice(0, 1000));
+
+      // Build stable, collision-free identifier
+      const fingerprint =
+        result.fingerprints?.['guid'] ||
+        (result.fingerprints ? Object.values(result.fingerprints)[0] : null);
+      const stableSuffix = fingerprint
+        ? String(fingerprint).slice(0, 16)
+        : `${runIndex}-${resultIndex}`;
+      const findingId = `SARIF-${ruleId}#${stableSuffix}`;
 
       findings.push({
-        id: `SARIF-${ruleId}`,
+        id: findingId,
         checkId: ruleId,
         adapterId: 'sarif-importer',
-        toolName,
-        toolVersion,
+        toolName: sanitizeOutput(String(toolName).slice(0, 100)),
+        toolVersion: sanitizeOutput(String(toolVersion).slice(0, 50)),
         category,
         status,
         severity,
@@ -158,10 +330,12 @@ export function importSarifReport(sarifPath, context = {}) {
           line: startLine,
           snippet,
         },
+        sarifKind: kind,
+        sarifLevel: level,
         checkMethod: 'static_analysis',
         recommendation,
-        manualVerificationRequired: false,
-        confidence: 'verified_fact',
+        manualVerificationRequired,
+        confidence,
       });
     }
   }

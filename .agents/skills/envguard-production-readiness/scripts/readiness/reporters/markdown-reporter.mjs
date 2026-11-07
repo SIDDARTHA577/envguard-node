@@ -27,6 +27,7 @@ export function generateMarkdownReport(report) {
   md += `| **PASS** | ${summary.pass} | Verified passing criteria |\n`;
   md += `| **FAIL** | ${summary.fail} | Blocking failures requiring remediation |\n`;
   md += `| **WARNING** | ${summary.warning} | Non-blocking risks or missing conventions |\n`;
+  md += `| **INFORMATIONAL** | ${summary.informational ?? 0} | Informational diagnostics and external notes |\n`;
   md += `| **NOT_RUN** | ${summary.notRun} | Checks skipped (authorization or infra unavailable) |\n`;
   md += `| **MANUAL_REVIEW** | ${summary.manualReview} | Heuristics requiring human engineering review |\n`;
   md += `| **NOT_APPLICABLE**| ${summary.notApplicable} | Checks irrelevant to detected project type |\n`;
@@ -85,6 +86,16 @@ export function generateMarkdownReport(report) {
     md += `## 5. Unexecuted & Manual Review Items (${manualAndNotRun.length})\n\n`;
     for (const item of manualAndNotRun) {
       md += `- **[${item.id}] ${escapeMarkdown(item.title)}** (${item.status}): ${escapeMarkdown(item.explanation)}\n`;
+    }
+    md += `\n`;
+  }
+
+  // 5b. Informational Diagnostics
+  const informational = findings.filter((f) => f.status === 'INFORMATIONAL');
+  if (informational.length > 0) {
+    md += `## Informational Diagnostics (${informational.length})\n\n`;
+    for (const info of informational) {
+      md += `- **[${info.id}] ${escapeMarkdown(info.title)}**: ${escapeMarkdown(info.explanation)}\n`;
     }
     md += `\n`;
   }
