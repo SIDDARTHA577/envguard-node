@@ -79,7 +79,7 @@ describe('Phase 2B Engineering Quality Skills & Fixture Evaluations', () => {
       const syncedPath = path.join(rootDir, '.agents', 'skills', skillName, 'SKILL.md');
       expect(fs.existsSync(syncedPath)).toBe(true);
       const syncedContent = fs.readFileSync(syncedPath, 'utf8');
-      expect(syncedContent).toBe(content);
+      expect(syncedContent.replace(/\r\n/g, '\n').trim()).toBe(content.replace(/\r\n/g, '\n').trim());
     }
   });
 

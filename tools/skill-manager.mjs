@@ -257,7 +257,7 @@ export function syncSkills({ repoRoot = REPO_ROOT, checkOnly = false } = {}) {
         issues.push(`Missing synchronized skill in .agents/skills/${skill.name}/SKILL.md`);
       } else {
         const destContent = fs.readFileSync(destSkill, 'utf8');
-        if (destContent !== canonicalContent) {
+        if (destContent.replace(/\r\n/g, '\n').trim() !== canonicalContent.replace(/\r\n/g, '\n').trim()) {
           issues.push(`Synchronized content mismatch in .agents/skills/${skill.name}/SKILL.md`);
         }
       }
@@ -386,7 +386,7 @@ export function verifySkills(repoRoot = REPO_ROOT) {
     const agentsSkillPath = path.join(repoRoot, '.agents', 'skills', skill.name, 'SKILL.md');
     if (fs.existsSync(agentsSkillPath)) {
       const agentsContent = fs.readFileSync(agentsSkillPath, 'utf8');
-      if (agentsContent !== rawContent) {
+      if (agentsContent.replace(/\r\n/g, '\n').trim() !== rawContent.replace(/\r\n/g, '\n').trim()) {
         errors.push(
           `Skill ${skill.name} is out of sync between ${skill.canonicalDir} and .agents/skills/${skill.name}.`
         );
