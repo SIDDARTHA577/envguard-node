@@ -1,0 +1,19 @@
+{
+  "name": "deep-defective-backend",
+  "version": "1.0.0",
+  "description": "Defective backend fixture containing SQL injection, hardcoded JWT secrets, insecure cookies, and missing indexes",
+  "type": "module",
+  "engines": {
+    "node": "^22.0.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "node -e \"process.exit(0)\""
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "@prisma/client": "^5.19.0",
+    "prisma": "^5.19.0",
+    "jsonwebtoken": "^9.0.2"
+  }
+}

@@ -1,0 +1,5 @@
+CREATE TABLE orders (
+  id VARCHAR(64) PRIMARY KEY,
+  amount DECIMAL(10, 2) NOT NULL,
+  customer_id VARCHAR(64) NOT NULL
+);

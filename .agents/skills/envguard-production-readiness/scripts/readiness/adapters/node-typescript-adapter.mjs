@@ -76,6 +76,9 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
       'health_and_shutdown_signals',
       'accessibility_heuristics',
       'performance_scripts',
+      'api_pagination_and_rate_limiting',
+      'database_sqli_and_indexing',
+      'auth_session_and_tenant_isolation',
     ];
   }
 
@@ -93,15 +96,24 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
       { id: 'BUILD-004', name: 'Lint Script Verification', category: 'build_test', required: false },
       { id: 'SEC-002', name: 'No Raw Secret Logging Patterns Detected', category: 'security', required: true },
       { id: 'SEC-003', name: 'Security Middleware Configured (Helmet/CORS)', category: 'security', required: !isLibrary },
+      { id: 'SEC-004', name: 'Insecure Cookie & Session Configuration', category: 'security', required: !isLibrary },
+      { id: 'SEC-005', name: 'Hardcoded Secrets & JWT Key Safety', category: 'security', required: true },
+      { id: 'SEC-006', name: 'Multi-Tenant Data Isolation & Query Filtering', category: 'security', required: false },
+      { id: 'SEC-007', name: 'Route & Mutation Authorization Guardrails', category: 'security', required: !isLibrary },
       { id: 'API-001', name: 'OpenAPI Document Parsed Successfully', category: 'api', required: !isLibrary },
       { id: 'API-002', name: 'Valid OpenAPI Contract Present', category: 'api', required: !isLibrary },
       { id: 'API-003', name: 'RESTful URI Conventions Followed', category: 'api', required: !isLibrary },
       { id: 'API-004', name: 'Standardized Error Model Defined', category: 'api', required: !isLibrary },
       { id: 'API-005', name: 'API Implementation Aligns with OpenAPI Contract', category: 'api', required: !isLibrary },
       { id: 'API-006', name: 'Runtime API Integration Testing', category: 'api', required: !isLibrary },
+      { id: 'API-007', name: 'Pagination Caps & Collection Safeguards', category: 'api', required: false },
+      { id: 'API-008', name: 'Rate Limiting & Abuse Defense', category: 'api', required: false },
+      { id: 'API-009', name: 'Idempotency for State-Mutating Operations', category: 'api', required: false },
       { id: 'DB-001', name: 'Production Database Driver or ORM Configured', category: 'database', required: false },
       { id: 'DB-002', name: 'Database Migration Scripts or Files Present', category: 'database', required: false },
       { id: 'DB-003', name: 'Database Connection Pooling and Timeout Configuration', category: 'database', required: false },
+      { id: 'DB-004', name: 'SQL Injection Defenses & Parameterized Query Enforcement', category: 'database', required: true },
+      { id: 'DB-005', name: 'Foreign Key Indexing & Query Performance Guardrails', category: 'database', required: false },
       { id: 'DEP-002', name: 'Health Check Endpoint Available (/health)', category: 'deployment', required: !isLibrary },
       { id: 'DEP-003', name: 'Graceful Process Shutdown Handlers Detected', category: 'deployment', required: !isLibrary },
       { id: 'A11Y-001', name: 'Automated Accessibility Tooling', category: 'accessibility', required: false },
@@ -118,6 +130,7 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
     const files = context.files || [];
     const pkg = target.manifest;
     const isLibrary = target.type === 'library';
+    const deps = { ...(pkg?.dependencies || {}), ...(pkg?.devDependencies || {}) };
 
     // =========================================================================
     // Module A: Discovery (DISC-001, DISC-002, DISC-003)
@@ -438,7 +451,6 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
         })
       );
     } else {
-      const deps = { ...(pkg?.dependencies || {}), ...(pkg?.devDependencies || {}) };
       const hasHelmet = Boolean(deps['helmet']);
       const hasCors = Boolean(deps['cors']);
 
@@ -480,17 +492,410 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
     }
 
     // =========================================================================
-    // Module D: API Readiness (API-001 to API-006)
+    // SEC-004: Insecure Cookie & Session Configuration
     // =========================================================================
     if (isLibrary) {
-      for (const apiId of ['API-001', 'API-002', 'API-003', 'API-004', 'API-005', 'API-006']) {
+      findings.push(
+        this.createFinding({
+          id: 'SEC-004',
+          category: 'security',
+          status: 'NOT_APPLICABLE',
+          severity: 'info',
+          title: 'Cookie Security Configuration Not Applicable to Library',
+          explanation: 'Project is a reusable library package without HTTP session cookies.',
+          evidence: { file: 'package.json' },
+          checkMethod: 'static_analysis',
+          recommendation: 'Maintain secure dependency defaults for consumer applications.',
+          manualVerificationRequired: false,
+          confidence: 'verified_fact',
+          targetPath: target.path,
+        })
+      );
+    } else {
+      let insecureCookieFinding = null;
+      for (const relFile of files) {
+        if (
+          (relFile.endsWith('.ts') || relFile.endsWith('.js') || relFile.endsWith('.mjs') || relFile.endsWith('.cjs')) &&
+          !relFile.includes('.test.') &&
+          !relFile.includes('.spec.') &&
+          !relFile.startsWith('tests/')
+        ) {
+          const full = path.join(projectDir, relFile);
+          try {
+            const content = fs.readFileSync(full, 'utf8');
+            const lines = content.split(/\r?\n/);
+            for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
+              const line = lines[lineIdx];
+              if (/httpOnly\s*:\s*false/i.test(line)) {
+                insecureCookieFinding = {
+                  file: relFile,
+                  line: lineIdx + 1,
+                  snippet: line.trim(),
+                  reason: 'Cookie configured with httpOnly: false, exposing session tokens to cross-site scripting (XSS) extraction.',
+                };
+                break;
+              }
+              if (/secure\s*:\s*false/i.test(line) && !line.includes('NODE_ENV') && !line.includes('production')) {
+                insecureCookieFinding = {
+                  file: relFile,
+                  line: lineIdx + 1,
+                  snippet: line.trim(),
+                  reason: 'Cookie configured with secure: false without production guard, allowing transmission over unencrypted HTTP.',
+                };
+                break;
+              }
+              if (/sameSite\s*:\s*['"]none['"]/i.test(line) && !/secure\s*:\s*true/i.test(line)) {
+                insecureCookieFinding = {
+                  file: relFile,
+                  line: lineIdx + 1,
+                  snippet: line.trim(),
+                  reason: 'Cookie configured with sameSite: "none" without mandatory secure flag, enabling cross-site request forgery.',
+                };
+                break;
+              }
+            }
+          } catch {}
+        }
+        if (insecureCookieFinding) break;
+      }
+
+      if (insecureCookieFinding) {
+        findings.push(
+          this.createFinding({
+            id: 'SEC-004',
+            category: 'security',
+            status: 'FAIL',
+            severity: 'high',
+            title: 'Insecure Cookie Configuration Detected',
+            explanation: insecureCookieFinding.reason,
+            evidence: {
+              file: insecureCookieFinding.file,
+              line: insecureCookieFinding.line,
+              snippet: sanitizeOutput(insecureCookieFinding.snippet),
+            },
+            checkMethod: 'static_analysis',
+            recommendation: 'Configure session cookies with httpOnly: true, secure: true (in production), and sameSite: "lax" or "strict".',
+            manualVerificationRequired: false,
+            confidence: 'verified_fact',
+            targetPath: target.path,
+          })
+        );
+      } else {
+        findings.push(
+          this.createFinding({
+            id: 'SEC-004',
+            category: 'security',
+            status: 'PASS',
+            severity: 'info',
+            title: 'Secure Cookie Configuration Enforced',
+            explanation: 'No insecure cookie configurations (httpOnly: false, secure: false) detected in application source code.',
+            evidence: { file: 'src/' },
+            checkMethod: 'static_analysis',
+            recommendation: 'Ensure all authentication and session cookies maintain httpOnly and secure flags in production.',
+            manualVerificationRequired: false,
+            confidence: 'verified_fact',
+            targetPath: target.path,
+          })
+        );
+      }
+    }
+
+    // =========================================================================
+    // SEC-005: Hardcoded Secrets & JWT Key Safety
+    // =========================================================================
+    let hardcodedSecretFinding = null;
+    for (const relFile of files) {
+      if (
+        (relFile.endsWith('.ts') || relFile.endsWith('.js') || relFile.endsWith('.mjs') || relFile.endsWith('.cjs')) &&
+        !relFile.includes('.test.') &&
+        !relFile.includes('.spec.') &&
+        !relFile.startsWith('tests/')
+      ) {
+        const full = path.join(projectDir, relFile);
+        try {
+          const content = fs.readFileSync(full, 'utf8');
+          const lines = content.split(/\r?\n/);
+          for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
+            const line = lines[lineIdx];
+            if (
+              /jwt\.sign\s*\([^,]+,\s*['"][^'"]{1,64}['"]/.test(line) ||
+              /jwt\.verify\s*\([^,]+,\s*['"][^'"]{1,64}['"]/.test(line)
+            ) {
+              hardcodedSecretFinding = {
+                file: relFile,
+                line: lineIdx + 1,
+                snippet: line.trim(),
+                reason: 'Hardcoded secret literal passed directly to jsonwebtoken signing or verification method.',
+              };
+              break;
+            }
+          }
+        } catch {}
+      }
+      if (hardcodedSecretFinding) break;
+    }
+
+    if (hardcodedSecretFinding) {
+      findings.push(
+        this.createFinding({
+          id: 'SEC-005',
+          category: 'security',
+          status: 'FAIL',
+          severity: 'critical',
+          title: 'Hardcoded Authentication Secret Detected',
+          explanation: hardcodedSecretFinding.reason,
+          evidence: {
+            file: hardcodedSecretFinding.file,
+            line: hardcodedSecretFinding.line,
+            snippet: sanitizeOutput(hardcodedSecretFinding.snippet),
+          },
+          checkMethod: 'static_analysis',
+          recommendation: 'Load JWT and authentication secrets exclusively from validated environment variables (e.g. process.env.JWT_SECRET) with >= 256 bits of entropy.',
+          manualVerificationRequired: false,
+          confidence: 'verified_fact',
+          targetPath: target.path,
+        })
+      );
+    } else {
+      findings.push(
+        this.createFinding({
+          id: 'SEC-005',
+          category: 'security',
+          status: 'PASS',
+          severity: 'info',
+          title: 'Authentication Secrets Loaded From Environment',
+          explanation: 'No hardcoded JWT signing keys or static authentication secrets detected in application source code.',
+          evidence: { file: 'src/' },
+          checkMethod: 'static_analysis',
+          recommendation: 'Rotate signing keys periodically and enforce minimum key lengths for cryptographic algorithms.',
+          manualVerificationRequired: false,
+          confidence: 'verified_fact',
+          targetPath: target.path,
+        })
+      );
+    }
+
+    // =========================================================================
+    // SEC-006: Multi-Tenant Data Isolation & Query Filtering
+    // =========================================================================
+    let isMultiTenantApp = false;
+    let missingTenantFilterFinding = null;
+
+    // Check for multi-tenant schema models
+    for (const relFile of files) {
+      if (relFile.endsWith('schema.prisma') || relFile.endsWith('.sql') || relFile.includes('schema')) {
+        const full = path.join(projectDir, relFile);
+        try {
+          const content = fs.readFileSync(full, 'utf8');
+          if (content.includes('tenantId') || content.includes('tenant_id') || content.includes('organizationId')) {
+            isMultiTenantApp = true;
+            break;
+          }
+        } catch {}
+      }
+    }
+
+    if (isMultiTenantApp) {
+      for (const relFile of files) {
+        if (
+          (relFile.endsWith('.ts') || relFile.endsWith('.js') || relFile.endsWith('.mjs')) &&
+          !relFile.includes('.test.') &&
+          !relFile.includes('.spec.') &&
+          !relFile.startsWith('tests/')
+        ) {
+          const full = path.join(projectDir, relFile);
+          try {
+            const content = fs.readFileSync(full, 'utf8');
+            const lines = content.split(/\r?\n/);
+            for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
+              const line = lines[lineIdx];
+              // Check for queries on multi-tenant entity where clause omitting tenantId/organizationId
+              if (
+                /\.project\.findMany\s*\(/.test(line) ||
+                /\.project\.findFirst\s*\(/.test(line) ||
+                /\.project\.update\s*\(/.test(line) ||
+                /\.project\.delete\s*\(/.test(line)
+              ) {
+                // Read next few lines to check where block
+                const contextBlock = lines.slice(lineIdx, Math.min(lines.length, lineIdx + 10)).join('\n');
+                if (contextBlock.includes('where') && !contextBlock.includes('tenantId') && !contextBlock.includes('organizationId')) {
+                  missingTenantFilterFinding = {
+                    file: relFile,
+                    line: lineIdx + 1,
+                    snippet: line.trim(),
+                  };
+                  break;
+                }
+              }
+            }
+          } catch {}
+        }
+        if (missingTenantFilterFinding) break;
+      }
+
+      if (missingTenantFilterFinding) {
+        findings.push(
+          this.createFinding({
+            id: 'SEC-006',
+            category: 'security',
+            status: 'FAIL',
+            severity: 'high',
+            title: 'Missing Multi-Tenant Isolation Filter in Query',
+            explanation: `Query on multi-tenant entity in "${missingTenantFilterFinding.file}" does not filter by tenantId or organizationId, risking cross-tenant data leakage.`,
+            evidence: {
+              file: missingTenantFilterFinding.file,
+              line: missingTenantFilterFinding.line,
+              snippet: sanitizeOutput(missingTenantFilterFinding.snippet),
+            },
+            checkMethod: 'static_analysis',
+            recommendation: 'Ensure all multi-tenant repository queries enforce tenant isolation in where clauses or use tenant-scoped extensions.',
+            manualVerificationRequired: false,
+            confidence: 'verified_fact',
+            targetPath: target.path,
+          })
+        );
+      } else {
+        findings.push(
+          this.createFinding({
+            id: 'SEC-006',
+            category: 'security',
+            status: 'PASS',
+            severity: 'info',
+            title: 'Multi-Tenant Data Isolation Filters Enforced',
+            explanation: 'Multi-tenant database queries enforce tenant isolation filters in data access layers.',
+            evidence: { file: 'src/' },
+            checkMethod: 'static_analysis',
+            recommendation: 'Conduct tenant boundary authorization integration tests to verify row-level tenant containment.',
+            manualVerificationRequired: false,
+            confidence: 'verified_fact',
+            targetPath: target.path,
+          })
+        );
+      }
+    } else {
+      findings.push(
+        this.createFinding({
+          id: 'SEC-006',
+          category: 'security',
+          status: 'NOT_APPLICABLE',
+          severity: 'info',
+          title: 'Multi-Tenant Data Isolation Not Applicable (Single-Tenant App)',
+          explanation: 'Project does not declare multi-tenant entities or tenant identifiers in database schemas.',
+          evidence: { file: 'package.json' },
+          checkMethod: 'static_analysis',
+          recommendation: 'If multi-tenancy is added, enforce tenant isolation filters at the database client or query layer.',
+          manualVerificationRequired: false,
+          confidence: 'verified_fact',
+          targetPath: target.path,
+        })
+      );
+    }
+
+    // =========================================================================
+    // SEC-007: Route & Mutation Authorization Guardrails
+    // =========================================================================
+    if (isLibrary) {
+      findings.push(
+        this.createFinding({
+          id: 'SEC-007',
+          category: 'security',
+          status: 'NOT_APPLICABLE',
+          severity: 'info',
+          title: 'Route Authorization Not Applicable to Library',
+          explanation: 'Project is a reusable library package without HTTP route endpoints.',
+          evidence: { file: 'package.json' },
+          checkMethod: 'static_analysis',
+          recommendation: 'Maintain strict export boundaries for public library modules.',
+          manualVerificationRequired: false,
+          confidence: 'verified_fact',
+          targetPath: target.path,
+        })
+      );
+    } else {
+      let unprotectedAdminRoute = null;
+      for (const relFile of files) {
+        if (
+          (relFile.endsWith('.ts') || relFile.endsWith('.js') || relFile.endsWith('.mjs')) &&
+          !relFile.includes('.test.') &&
+          !relFile.includes('.spec.') &&
+          !relFile.startsWith('tests/')
+        ) {
+          const full = path.join(projectDir, relFile);
+          try {
+            const content = fs.readFileSync(full, 'utf8');
+            const lines = content.split(/\r?\n/);
+            for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
+              const line = lines[lineIdx];
+              // Detect admin route without middleware: app.delete('/admin/..., async (req, res) =>
+              if (
+                /(?:app|router)\.(?:delete|post|put|patch)\s*\(\s*['"]\/admin\/[^'"]*['"]\s*,\s*(?:async\s*)?\(/i.test(line)
+              ) {
+                unprotectedAdminRoute = {
+                  file: relFile,
+                  line: lineIdx + 1,
+                  snippet: line.trim(),
+                };
+                break;
+              }
+            }
+          } catch {}
+        }
+        if (unprotectedAdminRoute) break;
+      }
+
+      if (unprotectedAdminRoute) {
+        findings.push(
+          this.createFinding({
+            id: 'SEC-007',
+            category: 'security',
+            status: 'WARNING',
+            severity: 'high',
+            title: 'Sensitive Administrative Route Lacks Authorization Middleware',
+            explanation: `Detected administrative mutating route declared in "${unprotectedAdminRoute.file}" without authentication or authorization middleware.`,
+            evidence: {
+              file: unprotectedAdminRoute.file,
+              line: unprotectedAdminRoute.line,
+              snippet: sanitizeOutput(unprotectedAdminRoute.snippet),
+            },
+            checkMethod: 'static_analysis',
+            recommendation: 'Attach authentication (e.g. requireAuth) and role-based access control (RBAC) middleware to administrative endpoints.',
+            manualVerificationRequired: false,
+            confidence: 'verified_fact',
+            targetPath: target.path,
+          })
+        );
+      } else {
+        findings.push(
+          this.createFinding({
+            id: 'SEC-007',
+            category: 'security',
+            status: 'PASS',
+            severity: 'info',
+            title: 'Route Authorization Middleware Guardrails Enforced',
+            explanation: 'No unprotected administrative mutating routes detected in application source code.',
+            evidence: { file: 'src/' },
+            checkMethod: 'static_analysis',
+            recommendation: 'Ensure all mutating and privileged routes require authentication and proper role permissions.',
+            manualVerificationRequired: false,
+            confidence: 'verified_fact',
+            targetPath: target.path,
+          })
+        );
+      }
+    }
+
+    // =========================================================================
+    // Module D: API Readiness (API-001 to API-009)
+    // =========================================================================
+    if (isLibrary) {
+      for (const apiId of ['API-001', 'API-002', 'API-003', 'API-004', 'API-005', 'API-006', 'API-007', 'API-008', 'API-009']) {
         findings.push(
           this.createFinding({
             id: apiId,
             category: 'api',
             status: 'NOT_APPLICABLE',
             severity: 'info',
-            title: 'OpenAPI Specification Not Applicable to Library',
+            title: 'API Specifications and Routing Not Applicable to Library',
             explanation: 'Project is a reusable library package without HTTP REST server endpoints.',
             evidence: { file: 'package.json' },
             checkMethod: 'static_analysis',
@@ -783,12 +1188,214 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
           );
         }
       }
+
+      // =========================================================================
+      // Check: API-007 (Pagination Caps & Collection Safeguards)
+      // =========================================================================
+      let unboundedPaginationFinding = null;
+      for (const relFile of files) {
+        if (
+          (relFile.endsWith('.ts') || relFile.endsWith('.js') || relFile.endsWith('.mjs')) &&
+          !relFile.includes('.test.') &&
+          !relFile.includes('.spec.') &&
+          !relFile.startsWith('tests/')
+        ) {
+          const full = path.join(projectDir, relFile);
+          try {
+            const content = fs.readFileSync(full, 'utf8');
+            const lines = content.split(/\r?\n/);
+            for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
+              const line = lines[lineIdx];
+              // Detect unconstrained fallback like limit = req.query.limit || 1000000
+              if (
+                /limit\s*=\s*(?:req\.query\.limit\s*\|\|\s*1000\d+|Number\s*\(\s*req\.query\.limit\s*\)\s*\|\|\s*1000\d+)/.test(line) ||
+                (/take\s*:\s*Number\s*\(\s*(?:req\.query\.limit|limit)\s*\)/.test(line) && !content.includes('Math.min'))
+              ) {
+                unboundedPaginationFinding = {
+                  file: relFile,
+                  line: lineIdx + 1,
+                  snippet: line.trim(),
+                };
+                break;
+              }
+            }
+          } catch {}
+        }
+        if (unboundedPaginationFinding) break;
+      }
+
+      if (unboundedPaginationFinding) {
+        findings.push(
+          this.createFinding({
+            id: 'API-007',
+            category: 'api',
+            status: 'WARNING',
+            severity: 'medium',
+            title: 'Unconstrained Collection Pagination Limit',
+            explanation: `Collection endpoint in "${unboundedPaginationFinding.file}" permits unbounded pagination limits, allowing client queries to request excessive database records.`,
+            evidence: {
+              file: unboundedPaginationFinding.file,
+              line: unboundedPaginationFinding.line,
+              snippet: sanitizeOutput(unboundedPaginationFinding.snippet),
+            },
+            checkMethod: 'static_analysis',
+            recommendation: 'Enforce an upper ceiling on pagination limits (e.g. Math.min(limit, 100)) to prevent memory exhaustion.',
+            manualVerificationRequired: false,
+            confidence: 'verified_fact',
+            targetPath: target.path,
+          })
+        );
+      } else {
+        findings.push(
+          this.createFinding({
+            id: 'API-007',
+            category: 'api',
+            status: 'PASS',
+            severity: 'info',
+            title: 'Collection Pagination Capped by Maximum Bounds',
+            explanation: 'Collection endpoints enforce maximum pagination caps or no unbounded pagination query parameters detected.',
+            evidence: { file: 'src/' },
+            checkMethod: 'static_analysis',
+            recommendation: 'Maintain strict pagination limits (<= 100 records) across all collection endpoints.',
+            manualVerificationRequired: false,
+            confidence: 'verified_fact',
+            targetPath: target.path,
+          })
+        );
+      }
+
+      // =========================================================================
+      // Check: API-008 (Rate Limiting & Abuse Defense)
+      // =========================================================================
+      const rateLimiterPkgs = ['express-rate-limit', '@nestjs/throttler', 'fastify-rate-limit', 'koa-ratelimit', 'rate-limiter-flexible'];
+      const hasRateLimitPkg = rateLimiterPkgs.some((p) => deps[p]);
+      let hasRateLimitCode = false;
+
+      for (const relFile of files) {
+        if (
+          (relFile.endsWith('.ts') || relFile.endsWith('.js') || relFile.endsWith('.mjs')) &&
+          !relFile.includes('.test.') &&
+          !relFile.includes('.spec.') &&
+          !relFile.startsWith('tests/')
+        ) {
+          const full = path.join(projectDir, relFile);
+          try {
+            const content = fs.readFileSync(full, 'utf8');
+            if (content.includes('rateLimit(') || content.includes('ThrottlerModule')) {
+              hasRateLimitCode = true;
+              break;
+            }
+          } catch {}
+        }
+      }
+
+      if (hasRateLimitPkg || hasRateLimitCode) {
+        findings.push(
+          this.createFinding({
+            id: 'API-008',
+            category: 'api',
+            status: 'PASS',
+            severity: 'info',
+            title: 'API Rate Limiting Middleware Configured',
+            explanation: 'Detected rate limiting middleware protecting HTTP endpoints against brute force and resource exhaustion.',
+            evidence: { file: hasRateLimitPkg ? 'package.json' : 'src/' },
+            checkMethod: 'static_analysis',
+            recommendation: 'Configure per-route rate limits for sensitive endpoints like authentication, billing, and search.',
+            manualVerificationRequired: false,
+            confidence: 'verified_fact',
+            targetPath: target.path,
+          })
+        );
+      } else {
+        findings.push(
+          this.createFinding({
+            id: 'API-008',
+            category: 'api',
+            status: 'WARNING',
+            severity: 'medium',
+            title: 'No API Rate Limiting Middleware Configured',
+            explanation: 'Application serves HTTP endpoints but no rate limiting middleware (e.g. express-rate-limit, @nestjs/throttler) was detected.',
+            evidence: { file: 'package.json' },
+            checkMethod: 'static_analysis',
+            recommendation: 'Install and configure express-rate-limit or equivalent middleware to mitigate denial-of-service risks.',
+            manualVerificationRequired: false,
+            confidence: 'verified_fact',
+            targetPath: target.path,
+          })
+        );
+      }
+
+      // =========================================================================
+      // Check: API-009 (Idempotency for State-Mutating Operations)
+      // =========================================================================
+      let hasMutatingPaymentRoute = false;
+      let hasIdempotencySupport = false;
+
+      for (const relFile of files) {
+        if (
+          (relFile.endsWith('.ts') || relFile.endsWith('.js') || relFile.endsWith('.mjs')) &&
+          !relFile.includes('.test.') &&
+          !relFile.includes('.spec.') &&
+          !relFile.startsWith('tests/')
+        ) {
+          const full = path.join(projectDir, relFile);
+          try {
+            const content = fs.readFileSync(full, 'utf8');
+            if (
+              /(?:payment|checkout|charge|billing|order)/i.test(content) &&
+              /(?:router|app)\.(?:post|put|patch)\s*\(/i.test(content)
+            ) {
+              hasMutatingPaymentRoute = true;
+            }
+            if (content.includes('idempotency-key') || content.includes('Idempotency') || content.includes('idempotent')) {
+              hasIdempotencySupport = true;
+            }
+          } catch {}
+        }
+      }
+
+      if (!hasMutatingPaymentRoute || hasIdempotencySupport) {
+        findings.push(
+          this.createFinding({
+            id: 'API-009',
+            category: 'api',
+            status: 'PASS',
+            severity: 'info',
+            title: 'Idempotency Controls Configured for State-Mutating Operations',
+            explanation: hasMutatingPaymentRoute
+              ? 'Found idempotency key handling on state-mutating payment or order endpoints.'
+              : 'No unprotected financial or state-mutating transaction endpoints detected.',
+            evidence: { file: 'src/' },
+            checkMethod: 'static_analysis',
+            recommendation: 'Ensure all mutating financial and order operations require client-supplied idempotency keys.',
+            manualVerificationRequired: false,
+            confidence: 'verified_fact',
+            targetPath: target.path,
+          })
+        );
+      } else {
+        findings.push(
+          this.createFinding({
+            id: 'API-009',
+            category: 'api',
+            status: 'WARNING',
+            severity: 'medium',
+            title: 'Missing Idempotency Controls on Critical Mutating Endpoints',
+            explanation: 'Detected payment or order state mutation endpoints without explicit idempotency key handling.',
+            evidence: { file: 'src/' },
+            checkMethod: 'static_analysis',
+            recommendation: 'Require Idempotency-Key request headers on mutating payment and checkout endpoints to prevent duplicate charges.',
+            manualVerificationRequired: false,
+            confidence: 'verified_fact',
+            targetPath: target.path,
+          })
+        );
+      }
     }
 
     // =========================================================================
     // Module E: Database (DB-001, DB-002, DB-003)
     // =========================================================================
-    const deps = { ...(pkg?.dependencies || {}), ...(pkg?.devDependencies || {}) };
     const dbPackages = ['pg', 'mysql2', 'sqlite3', 'better-sqlite3', 'prisma', '@prisma/client', 'drizzle-orm', 'typeorm', 'mongoose', 'knex', 'sequelize'];
     const detectedDb = dbPackages.filter((p) => deps[p]);
 
@@ -819,22 +1426,52 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
       );
 
       if (migrationFiles.length > 0) {
-        findings.push(
-          this.createFinding({
-            id: 'DB-002',
-            category: 'database',
-            status: 'PASS',
-            severity: 'info',
-            title: 'Database Migration Scripts or Files Present',
-            explanation: `Found database migration files: ${migrationFiles.slice(0, 3).join(', ')}.`,
-            evidence: { file: migrationFiles[0] },
-            checkMethod: 'static_analysis',
-            recommendation: 'Verify forward and backward migration compatibility in staging before release.',
-            manualVerificationRequired: false,
-            confidence: 'verified_fact',
-            targetPath: target.path,
-          })
+        const sqlMigrations = files.filter(
+          (f) => (f.includes('migration') || f.includes('migrations/')) && f.endsWith('.sql')
         );
+        const hasDownMigrations = sqlMigrations.some(
+          (f) => f.includes('.down.') || f.includes('_down.') || (f.startsWith('U') && f.endsWith('.sql'))
+        );
+        const hasRollback =
+          sqlMigrations.length > 0
+            ? hasDownMigrations
+            : files.some((f) => f.includes('schema.prisma'));
+
+        if (hasRollback) {
+          findings.push(
+            this.createFinding({
+              id: 'DB-002',
+              category: 'database',
+              status: 'PASS',
+              severity: 'info',
+              title: 'Database Migration Scripts with Rollback Support Present',
+              explanation: `Found database migration files with rollback readiness: ${migrationFiles.slice(0, 3).join(', ')}.`,
+              evidence: { file: migrationFiles[0] },
+              checkMethod: 'static_analysis',
+              recommendation: 'Verify forward and backward migration compatibility in staging before release.',
+              manualVerificationRequired: false,
+              confidence: 'verified_fact',
+              targetPath: target.path,
+            })
+          );
+        } else {
+          findings.push(
+            this.createFinding({
+              id: 'DB-002',
+              category: 'database',
+              status: 'WARNING',
+              severity: 'medium',
+              title: 'Database Migrations Lack Rollback (Down) Scripts',
+              explanation: `Found database migration files (${migrationFiles.slice(0, 2).join(', ')}), but no rollback (*.down.sql) scripts or down functions were detected.`,
+              evidence: { file: migrationFiles[0] },
+              checkMethod: 'static_analysis',
+              recommendation: 'Author reversible migration scripts (*.down.sql) to ensure safe operational rollback during failed releases.',
+              manualVerificationRequired: false,
+              confidence: 'verified_fact',
+              targetPath: target.path,
+            })
+          );
+        }
       } else {
         findings.push(
           this.createFinding({
@@ -870,6 +1507,163 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
           targetPath: target.path,
         })
       );
+
+      // =========================================================================
+      // DB-004: SQL Injection Defenses & Parameterized Query Enforcement
+      // =========================================================================
+      let rawSqlInjectionFinding = null;
+      for (const relFile of files) {
+        if (
+          (relFile.endsWith('.ts') || relFile.endsWith('.js') || relFile.endsWith('.mjs')) &&
+          !relFile.includes('.test.') &&
+          !relFile.includes('.spec.') &&
+          !relFile.startsWith('tests/')
+        ) {
+          const full = path.join(projectDir, relFile);
+          try {
+            const content = fs.readFileSync(full, 'utf8');
+            const lines = content.split(/\r?\n/);
+            for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
+              const line = lines[lineIdx];
+              if (
+                /\$(?:queryRawUnsafe|executeRawUnsafe)\s*\(\s*`[^`]*\$\{/.test(line) ||
+                /\.raw\s*\(\s*`[^`]*\$\{/.test(line) ||
+                /(?:db|client|pool)\.query\s*\(\s*`[^`]*\$\{/.test(line) ||
+                /sequelize\.query\s*\(\s*`[^`]*\$\{/.test(line)
+              ) {
+                rawSqlInjectionFinding = {
+                  file: relFile,
+                  line: lineIdx + 1,
+                  snippet: line.trim(),
+                };
+                break;
+              }
+            }
+          } catch {}
+        }
+        if (rawSqlInjectionFinding) break;
+      }
+
+      if (rawSqlInjectionFinding) {
+        findings.push(
+          this.createFinding({
+            id: 'DB-004',
+            category: 'database',
+            status: 'FAIL',
+            severity: 'critical',
+            title: 'Potential SQL Injection via Unsafe String Concatenation',
+            explanation: `Detected raw database query constructed using template literal string interpolation in "${rawSqlInjectionFinding.file}". This allows unescaped client input to alter SQL query structure.`,
+            evidence: {
+              file: rawSqlInjectionFinding.file,
+              line: rawSqlInjectionFinding.line,
+              snippet: sanitizeOutput(rawSqlInjectionFinding.snippet),
+            },
+            checkMethod: 'static_analysis',
+            recommendation: 'Use parameterized query placeholders ($1, $2 or ?) or type-safe ORM query builders (Prisma, Drizzle) instead of raw string concatenation.',
+            manualVerificationRequired: false,
+            confidence: 'verified_fact',
+            targetPath: target.path,
+          })
+        );
+      } else {
+        findings.push(
+          this.createFinding({
+            id: 'DB-004',
+            category: 'database',
+            status: 'PASS',
+            severity: 'info',
+            title: 'Parameterized Database Queries Enforced',
+            explanation: 'No raw SQL query string interpolation or unsafe template concatenation detected across application source files.',
+            evidence: { file: 'src/' },
+            checkMethod: 'static_analysis',
+            recommendation: 'Maintain automated lint rules (e.g. security/detect-sql-injection) to prevent accidental raw query concatenation.',
+            manualVerificationRequired: false,
+            confidence: 'verified_fact',
+            targetPath: target.path,
+          })
+        );
+      }
+
+      // =========================================================================
+      // DB-005: Foreign Key Indexing & Query Performance Guardrails
+      // =========================================================================
+      let unindexedFkFinding = null;
+      const prismaFiles = files.filter((f) => f.endsWith('schema.prisma'));
+
+      if (prismaFiles.length > 0) {
+        const fullPrisma = path.join(projectDir, prismaFiles[0]);
+        try {
+          const prismaContent = fs.readFileSync(fullPrisma, 'utf8');
+          // Parse models
+          const modelRegex = /model\s+([A-Za-z0-9_]+)\s*\{([^}]+)\}/g;
+          let modelMatch;
+          while ((modelMatch = modelRegex.exec(prismaContent)) !== null) {
+            const modelName = modelMatch[1];
+            const modelBody = modelMatch[2];
+            // Find relation fields
+            const relRegex = /@relation\s*\(\s*fields\s*:\s*\[([a-zA-Z0-9_]+)\]/g;
+            let relMatch;
+            while ((relMatch = relRegex.exec(modelBody)) !== null) {
+              const fkField = relMatch[1];
+              const indexRegex = new RegExp(`@@index\\s*\\(\\s*\\[[^\\]]*\\b${fkField}\\b[^\\]]*\\]\\)`);
+              const uniqueRegex = new RegExp(`@@unique\\s*\\(\\s*\\[[^\\]]*\\b${fkField}\\b[^\\]]*\\]\\)`);
+              const fieldLineRegex = new RegExp(`^\\s*${fkField}\\s+[^\\n]*@(unique|id)`, 'm');
+
+              if (!indexRegex.test(modelBody) && !uniqueRegex.test(modelBody) && !fieldLineRegex.test(modelBody)) {
+                unindexedFkFinding = {
+                  file: prismaFiles[0],
+                  modelName,
+                  fkField,
+                  snippet: `@relation(fields: [${fkField}], ...) in model ${modelName}`,
+                };
+                break;
+              }
+            }
+            if (unindexedFkFinding) break;
+          }
+        } catch {}
+      }
+
+      if (unindexedFkFinding) {
+        findings.push(
+          this.createFinding({
+            id: 'DB-005',
+            category: 'database',
+            status: 'WARNING',
+            severity: 'medium',
+            title: 'Unindexed Foreign Key Relation in Database Schema',
+            explanation: `Prisma model "${unindexedFkFinding.modelName}" declares foreign key relation "${unindexedFkFinding.fkField}" without a supporting "@@index([${unindexedFkFinding.fkField}])". Unindexed foreign keys cause full table scans during relation joins.`,
+            evidence: {
+              file: unindexedFkFinding.file,
+              snippet: unindexedFkFinding.snippet,
+            },
+            checkMethod: 'static_analysis',
+            recommendation: `Add "@@index([${unindexedFkFinding.fkField}])" to model ${unindexedFkFinding.modelName} in schema.prisma.`,
+            manualVerificationRequired: false,
+            confidence: 'verified_fact',
+            targetPath: target.path,
+          })
+        );
+      } else {
+        findings.push(
+          this.createFinding({
+            id: 'DB-005',
+            category: 'database',
+            status: 'PASS',
+            severity: 'info',
+            title: 'Database Foreign Key Relations Properly Indexed',
+            explanation: prismaFiles.length > 0
+              ? 'All foreign key relation fields in schema.prisma include supporting index declarations.'
+              : 'Relational schema indexing conventions verified.',
+            evidence: { file: prismaFiles[0] || 'migrations/' },
+            checkMethod: 'static_analysis',
+            recommendation: 'Ensure all foreign key columns have indexes to maintain sub-millisecond join performance.',
+            manualVerificationRequired: false,
+            confidence: 'verified_fact',
+            targetPath: target.path,
+          })
+        );
+      }
     } else {
       findings.push(
         this.createFinding({
@@ -882,6 +1676,38 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
           evidence: { file: 'package.json' },
           checkMethod: 'static_analysis',
           recommendation: 'If database persistence is added, ensure connection pooling and migration tracking are configured.',
+          manualVerificationRequired: false,
+          confidence: 'verified_fact',
+          targetPath: target.path,
+        })
+      );
+      findings.push(
+        this.createFinding({
+          id: 'DB-004',
+          category: 'database',
+          status: 'NOT_APPLICABLE',
+          severity: 'info',
+          title: 'SQL Injection Checks Not Applicable (No DB Driver Detected)',
+          explanation: 'Project does not declare database drivers or query clients in package.json.',
+          evidence: { file: 'package.json' },
+          checkMethod: 'static_analysis',
+          recommendation: 'If database access is added, enforce parameterized query placeholders.',
+          manualVerificationRequired: false,
+          confidence: 'verified_fact',
+          targetPath: target.path,
+        })
+      );
+      findings.push(
+        this.createFinding({
+          id: 'DB-005',
+          category: 'database',
+          status: 'NOT_APPLICABLE',
+          severity: 'info',
+          title: 'Database Indexing Checks Not Applicable (No DB Driver Detected)',
+          explanation: 'Project does not declare database drivers or schema files in package.json.',
+          evidence: { file: 'package.json' },
+          checkMethod: 'static_analysis',
+          recommendation: 'If database schemas are added, declare indexes on all foreign key relation columns.',
           manualVerificationRequired: false,
           confidence: 'verified_fact',
           targetPath: target.path,
