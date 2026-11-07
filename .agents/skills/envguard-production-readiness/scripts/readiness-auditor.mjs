@@ -170,6 +170,7 @@ export function main(argv = process.argv.slice(2)) {
   let previewCommands = false;
   let execCommands = null;
   let timeoutMs = 10000;
+  let sarifPath = null;
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -191,6 +192,7 @@ Options:
   --trust-project          Explicitly acknowledge executing scripts on unisolated host without container containment
   --exec-commands <list>   Comma-separated list of allowed scripts to execute (e.g. "test,build")
   --preview-commands       Preview planned commands and their network/filesystem effects without running them
+  --sarif <file>           Path to SARIF report to import static analysis findings (CodeQL, ESLint, Trivy)
   --timeout <ms>           Maximum execution time per command in ms (default: 10000, max: 120000)
   --help, -h               Show this help message
 
@@ -255,6 +257,13 @@ Safety Boundaries:
       trustProject = true;
     } else if (arg === '--preview-commands') {
       previewCommands = true;
+    } else if (arg === '--sarif') {
+      const val = argv[++i];
+      if (!val || val.startsWith('--')) {
+        console.error('Error: Option "--sarif" requires a file path.');
+        return EXIT_CODES.INVALID_ARGUMENTS;
+      }
+      sarifPath = val;
     } else if (arg === '--exec-commands') {
       const val = argv[++i];
       if (!val || val.startsWith('--')) {
@@ -330,6 +339,7 @@ Safety Boundaries:
       allowExec,
       trustProject,
       timeoutMs,
+      sarifPath,
       allowedCommands: execCommands,
     });
   } catch (err) {

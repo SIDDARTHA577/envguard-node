@@ -12,6 +12,7 @@ import {
 } from '../constants.mjs';
 import { buildInventoryGraph } from './discovery.mjs';
 import { createDefaultRegistry } from '../adapters/registry.mjs';
+import { importSarifReport } from './sarif.mjs';
 import { runProjectCommand, isEnvironmentIsolated } from '../execution/runner.mjs';
 import { evaluateReleasePolicy } from '../policies/release-policy.mjs';
 import { formatJsonReport } from '../reporters/json-reporter.mjs';
@@ -30,6 +31,7 @@ import { generateMarkdownReport } from '../reporters/markdown-reporter.mjs';
  * @param {boolean|null} [options.isIsolated=null] - Overrides container isolation detection
  * @param {number} [options.timeoutMs=10000] - Subprocess execution timeout in ms
  * @param {string[]|null} [options.allowedCommands=null] - Specific commands allowlist
+ * @param {string|null} [options.sarifPath=null] - Optional path to SARIF report to import static analysis findings
  * @param {string|null} [options.outputDir=null] - Directory to save generated reports
  * @param {string} [options.format='both'] - Output format ('json', 'markdown', 'both')
  * @returns {object} Final readiness report object conformant to catalog/readiness-report.schema.json
@@ -42,6 +44,7 @@ export function runReadinessAudit({
   isIsolated = null,
   timeoutMs = 10000,
   allowedCommands = null,
+  sarifPath = null,
   outputDir = null,
   format = 'both',
 } = {}) {
@@ -68,6 +71,7 @@ export function runReadinessAudit({
     isIsolated,
     timeoutMs,
     allowedCommands,
+    sarifPath,
     executionAudit,
   };
 
@@ -118,6 +122,15 @@ export function runReadinessAudit({
     }
   }
 
+  // 2b. Optional SARIF Report Import (SAST, dependency, or secret scanning results)
+  if (sarifPath) {
+    limitations.add('SARIF findings represent imported external scanner results subject to the scanner tool precision and ruleset.');
+    const sarifFindings = importSarifReport(sarifPath, context);
+    for (const finding of sarifFindings) {
+      allFindings.push(finding);
+    }
+  }
+
   // 3. Filter findings by requested categories
   const filteredFindings = allFindings.filter((f) => categories.includes(f.category));
 
@@ -164,6 +177,7 @@ export function runReadinessAudit({
       trustProject,
       timeoutMs,
       categories,
+      sarifPath: sarifPath || undefined,
       allowedCommands: allowedCommands || undefined,
     },
     executionPolicy: {

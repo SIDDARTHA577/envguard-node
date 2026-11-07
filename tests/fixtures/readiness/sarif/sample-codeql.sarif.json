@@ -1,0 +1,137 @@
+{
+  "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "CodeQL",
+          "version": "2.16.0",
+          "rules": [
+            {
+              "id": "js/sql-injection",
+              "name": "SqlInjection",
+              "shortDescription": {
+                "text": "Database query built from user-controlled sources"
+              },
+              "fullDescription": {
+                "text": "Building a database query using string concatenation of user-controlled input can lead to SQL injection."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "tags": ["security", "database", "injection"],
+                "security-severity": "9.8"
+              },
+              "help": {
+                "text": "Use parameterized queries or prepared statements instead of string concatenation."
+              }
+            },
+            {
+              "id": "js/missing-rate-limiting",
+              "name": "MissingRateLimiting",
+              "shortDescription": {
+                "text": "Sensitive route without rate limiting"
+              },
+              "fullDescription": {
+                "text": "Authentication endpoint does not enforce rate limiting."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              },
+              "properties": {
+                "tags": ["security", "api"],
+                "security-severity": "6.5"
+              },
+              "help": {
+                "text": "Add express-rate-limit middleware to login endpoints."
+              }
+            },
+            {
+              "id": "js/debugger-statement",
+              "name": "DebuggerStatement",
+              "shortDescription": {
+                "text": "Use of debugger statement"
+              },
+              "defaultConfiguration": {
+                "level": "note"
+              },
+              "properties": {
+                "tags": ["maintainability"]
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "js/sql-injection",
+          "level": "error",
+          "message": {
+            "text": "Query built from untrusted source in request parameters."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/controllers/users.ts"
+                },
+                "region": {
+                  "startLine": 45,
+                  "snippet": {
+                    "text": "db.query(`SELECT * FROM users WHERE id = '${userId}'`)"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "js/missing-rate-limiting",
+          "level": "warning",
+          "message": {
+            "text": "Route /api/v1/auth/login lacks rate limiting middleware."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/routes/auth.ts"
+                },
+                "region": {
+                  "startLine": 18,
+                  "snippet": {
+                    "text": "router.post('/login', authController.login);"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "js/debugger-statement",
+          "level": "note",
+          "message": {
+            "text": "Debugger statement left in test helper."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/utils/debug.ts"
+                },
+                "region": {
+                  "startLine": 5,
+                  "snippet": {
+                    "text": "debugger;"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

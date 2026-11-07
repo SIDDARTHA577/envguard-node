@@ -58,6 +58,10 @@ Guides engineers and AI agents in conducting rigorous, evidence-based applicatio
   ```bash
   node .agents/skills/envguard-production-readiness/scripts/readiness-auditor.mjs scan --project ./my-app --format both --output-dir ./reports
   ```
+- Import external SAST / CodeQL results via SARIF:
+  ```bash
+  node .agents/skills/envguard-production-readiness/scripts/readiness-auditor.mjs scan --project ./my-app --sarif ./results.sarif --format both --output-dir ./reports
+  ```
 - Run authorized verification in container isolation or with explicit host trust:
   ```bash
   node .agents/skills/envguard-production-readiness/scripts/readiness-auditor.mjs scan --project ./my-app --allow-exec --trust-project --format both --output-dir ./reports
@@ -67,11 +71,11 @@ Guides engineers and AI agents in conducting rigorous, evidence-based applicatio
 1. **Project Discovery**: Detects manifest (`package.json`), runtime versions (`engines.node`, `.nvmrc`), lockfiles (`package-lock.json`, `pnpm-lock.yaml`), and frameworks.
 2. **Environment Configuration**: Verifies template presence (`.env.example`), `.gitignore` exclusions for `.env`, startup schema validation (`guard()`), and flags hardcoded secrets.
 3. **Build & Test Readiness**: Verifies passing status for build, test, lint, and typecheck scripts. When unapproved, marks as `NOT_RUN`.
-4. **Security Readiness**: Audits automated dependency update tooling (Dependabot/Renovate), sensitive logging patterns, security headers (`helmet`), and CORS.
-5. **API Contract Readiness**: Validates OpenAPI 3.x schema structure, RFC 7807/9457 Problem Details error models, RESTful URL naming, and collection pagination caps.
-6. **Database Readiness**: Checks for database driver/ORM presence, versioned schema migrations (`migrations/`), indexing, and flags live migrations as `MANUAL_REVIEW`.
+4. **Security Readiness**: Audits automated dependency update tooling (Dependabot/Renovate), sensitive logging patterns, security headers (`helmet`), CORS, cookie security (`httpOnly`, `secure`, `sameSite`), hardcoded JWT secrets, multi-tenant query isolation, administrative route authorization, and SARIF static analysis import.
+5. **API Contract Readiness**: Validates OpenAPI 3.x schema structure, RFC 7807/9457 Problem Details error models, RESTful URL naming, collection pagination limits, rate limiting middleware, and mutation idempotency.
+6. **Database Readiness**: Checks for database driver/ORM presence, versioned schema migrations with rollback support (`migrations/*.down.sql`), foreign key relation indexes, and parameterized query enforcement against raw SQL injection.
 7. **Deployment & Operations**: Verifies containerization (`Dockerfile`), health check routes (`/health`), graceful shutdown signal listeners (`SIGTERM`), and CI workflows.
-8. **Accessibility & Frontend**: Detects accessibility tooling (`eslint-plugin-jsx-a11y`, `axe-core`) and flags screen reader navigation as `MANUAL_REVIEW`.
+8. **Accessibility & Frontend**: Detects accessibility tooling (`eslint-plugin-jsx-a11y`, `axe-core`), route error boundaries (`error.tsx`), accessible form feedback, and flags screen reader navigation as `MANUAL_REVIEW`.
 9. **Performance Readiness**: Identifies load test scripts (k6) and flags live synthetic traffic generation as `NOT_RUN`.
 
 ### Step 4: Interpret Standardized Findings

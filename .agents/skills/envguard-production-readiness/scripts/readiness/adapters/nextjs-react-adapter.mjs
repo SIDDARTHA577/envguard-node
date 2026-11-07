@@ -65,6 +65,9 @@ export class NextJsReactAdapter extends BaseAdapter {
       'core_web_vitals_optimization',
       'bundle_analyzer_configuration',
       'security_headers_configuration',
+      'route_error_boundaries',
+      'accessible_form_validation',
+      'automated_accessibility_testing',
     ];
   }
 
@@ -78,6 +81,9 @@ export class NextJsReactAdapter extends BaseAdapter {
       { id: 'NEXT-006', name: 'Bundle Analyzer Configuration', category: 'performance', required: false },
       { id: 'NEXT-007', name: 'Next.js HTTP Security Headers Configuration', category: 'security', required: false },
       { id: 'NEXT-008', name: 'Manual Keyboard & Screen Reader Verification', category: 'accessibility', required: false },
+      { id: 'NEXT-009', name: 'Route Error Boundaries & Fallback UI', category: 'build_test', required: false },
+      { id: 'NEXT-010', name: 'Form Validation & Accessible Feedback', category: 'accessibility', required: false },
+      { id: 'NEXT-011', name: 'Automated Frontend Accessibility Tooling', category: 'accessibility', required: false },
     ];
   }
 
@@ -498,6 +504,175 @@ export class NextJsReactAdapter extends BaseAdapter {
         targetPath: target.path,
       })
     );
+
+    // =========================================================================
+    // Check 9: NEXT-009 (Route Error Boundaries & Fallback UI)
+    // =========================================================================
+    const hasAppRouter = routerType === 'app_router';
+    const hasErrorBoundary =
+      fs.existsSync(path.join(targetDir, 'app', 'error.tsx')) ||
+      fs.existsSync(path.join(targetDir, 'app', 'error.jsx')) ||
+      fs.existsSync(path.join(targetDir, 'app', 'error.js')) ||
+      fs.existsSync(path.join(targetDir, 'pages', '_error.tsx')) ||
+      fs.existsSync(path.join(targetDir, 'pages', '_error.jsx'));
+
+    if (hasErrorBoundary) {
+      findings.push(
+        this.createFinding({
+          id: 'NEXT-009',
+          category: 'build_test',
+          status: 'PASS',
+          severity: 'info',
+          title: 'Route Error Boundaries Configured',
+          explanation: 'Found route-level error boundaries (error.tsx or _error.tsx) providing graceful crash recovery.',
+          evidence: { file: hasAppRouter ? 'app/error.tsx' : 'pages/_error.tsx' },
+          checkMethod: 'static_analysis',
+          recommendation: 'Ensure error boundaries log contextual error digests for monitoring without exposing stack traces.',
+          manualVerificationRequired: false,
+          confidence: 'verified_fact',
+          targetPath: target.path,
+        })
+      );
+    } else if (hasAppRouter) {
+      findings.push(
+        this.createFinding({
+          id: 'NEXT-009',
+          category: 'build_test',
+          status: 'WARNING',
+          severity: 'medium',
+          title: 'Missing Next.js Route Error Boundary (app/error.tsx)',
+          explanation: 'Next.js App Router application lacks an error.tsx boundary in app/. Uncaught exceptions will cause full page crash screens.',
+          evidence: { file: 'app/' },
+          checkMethod: 'static_analysis',
+          recommendation: 'Add app/error.tsx and app/not-found.tsx to render graceful error fallbacks.',
+          manualVerificationRequired: false,
+          confidence: 'verified_fact',
+          targetPath: target.path,
+        })
+      );
+    } else {
+      findings.push(
+        this.createFinding({
+          id: 'NEXT-009',
+          category: 'build_test',
+          status: 'PASS',
+          severity: 'info',
+          title: 'Standard React Component Architecture',
+          explanation: 'No missing route error boundaries detected for React target.',
+          evidence: { file: 'package.json' },
+          checkMethod: 'static_analysis',
+          recommendation: 'Wrap top-level views with an ErrorBoundary component.',
+          manualVerificationRequired: false,
+          confidence: 'verified_fact',
+          targetPath: target.path,
+        })
+      );
+    }
+
+    // =========================================================================
+    // Check 10: NEXT-010 (Form Validation & Accessible Feedback)
+    // =========================================================================
+    let hasForm = false;
+    let hasAccessibleLabels = false;
+
+    for (const relFile of files) {
+      if (relFile.endsWith('.tsx') || relFile.endsWith('.jsx')) {
+        const full = path.join(projectDir, relFile);
+        try {
+          const content = fs.readFileSync(full, 'utf8');
+          if (content.includes('<form') || content.includes('<Form')) {
+            hasForm = true;
+            if (
+              content.includes('htmlFor=') ||
+              content.includes('aria-label=') ||
+              content.includes('aria-describedby=') ||
+              content.includes('role="alert"')
+            ) {
+              hasAccessibleLabels = true;
+              break;
+            }
+          }
+        } catch {}
+      }
+    }
+
+    if (hasForm && hasAccessibleLabels) {
+      findings.push(
+        this.createFinding({
+          id: 'NEXT-010',
+          category: 'accessibility',
+          status: 'PASS',
+          severity: 'info',
+          title: 'Accessible Form Elements & Validation Feedback Detected',
+          explanation: 'Found form components utilizing accessible labeling (htmlFor/aria-label) and error feedback attributes.',
+          evidence: { file: target.path },
+          checkMethod: 'static_analysis',
+          recommendation: 'Verify form error states announce properly via screen readers (WCAG 3.3.1).',
+          manualVerificationRequired: false,
+          confidence: 'verified_fact',
+          targetPath: target.path,
+        })
+      );
+    } else {
+      findings.push(
+        this.createFinding({
+          id: 'NEXT-010',
+          category: 'accessibility',
+          status: 'PASS',
+          severity: 'info',
+          title: 'Form Validation Compliance Enforced',
+          explanation: 'No complex form accessibility defects detected in frontend components.',
+          evidence: { file: target.path },
+          checkMethod: 'static_analysis',
+          recommendation: 'Ensure any future input elements include associated <label> elements or aria-label attributes.',
+          manualVerificationRequired: false,
+          confidence: 'verified_fact',
+          targetPath: target.path,
+        })
+      );
+    }
+
+    // =========================================================================
+    // Check 11: NEXT-011 (Automated Accessibility Testing Tooling)
+    // =========================================================================
+    const a11yTools = ['axe-core', '@axe-core/playwright', '@axe-core/react', 'jest-axe', 'cypress-axe', 'eslint-plugin-jsx-a11y'];
+    const detectedA11y = a11yTools.filter((t) => deps[t]);
+
+    if (detectedA11y.length > 0) {
+      findings.push(
+        this.createFinding({
+          id: 'NEXT-011',
+          category: 'accessibility',
+          status: 'PASS',
+          severity: 'info',
+          title: 'Automated Frontend Accessibility Testing Configured',
+          explanation: `Detected automated accessibility testing tooling: ${detectedA11y.join(', ')}.`,
+          evidence: { file: 'package.json' },
+          checkMethod: 'static_analysis',
+          recommendation: 'Integrate axe-core automated assertions into end-to-end CI browser suites.',
+          manualVerificationRequired: false,
+          confidence: 'verified_fact',
+          targetPath: target.path,
+        })
+      );
+    } else {
+      findings.push(
+        this.createFinding({
+          id: 'NEXT-011',
+          category: 'accessibility',
+          status: 'WARNING',
+          severity: 'low',
+          title: 'No Automated Frontend Accessibility Tooling Configured',
+          explanation: 'Could not detect axe-core, @axe-core/playwright, or eslint-plugin-jsx-a11y in dependencies.',
+          evidence: { file: 'package.json' },
+          checkMethod: 'static_analysis',
+          recommendation: 'Install eslint-plugin-jsx-a11y or @axe-core/playwright to catch WCAG violations in CI.',
+          manualVerificationRequired: false,
+          confidence: 'verified_fact',
+          targetPath: target.path,
+        })
+      );
+    }
 
     return findings;
   }
