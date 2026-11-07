@@ -57,7 +57,8 @@
     "skills:list": "node tools/skill-manager.mjs list",
     "skills:sync": "node tools/skill-manager.mjs sync",
     "skills:verify": "node tools/skill-manager.mjs verify",
-    "skills:install": "node tools/skill-manager.mjs install"
+    "skills:install": "node tools/skill-manager.mjs install",
+    "readiness:audit": "node tools/readiness-auditor.mjs scan"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

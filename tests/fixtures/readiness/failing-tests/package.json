@@ -1,0 +1,7 @@
+{
+  "name": "failing-tests-app",
+  "version": "1.0.0",
+  "scripts": {
+    "test": "node -e \"console.error('AssertionError: expected status 200, received 500'); process.exit(1)\""
+  }
+}

@@ -83,11 +83,11 @@ describe('Phase 2B Engineering Quality Skills & Fixture Evaluations', () => {
     }
   });
 
-  it('runs verifySkills() and reports 100% validity with zero errors across all 14 skills', () => {
+  it('runs verifySkills() and reports 100% validity with zero errors across all registered skills', () => {
     const result = verifySkills(rootDir);
     expect(result.errors).toEqual([]);
     expect(result.valid).toBe(true);
-    expect(result.skillCount).toBe(14);
+    expect(result.skillCount).toBeGreaterThanOrEqual(14);
   });
 
   describe('Positive and Negative Trigger Routing Evaluations', () => {

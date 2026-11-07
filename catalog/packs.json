@@ -32,6 +32,7 @@
     "name": "EnvGuard Production Readiness & Verification",
     "description": "Production engineering, automated testing, security audits, accessibility, DevOps pipelines, observability, load testing, and deployment readiness reviews.",
     "skills": [
+      "envguard-production-readiness",
       "envguard-test-engineer",
       "envguard-security-audit",
       "envguard-accessibility",

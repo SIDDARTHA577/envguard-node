@@ -366,6 +366,33 @@
         "Fix form accessibility by associating labels, adding aria-describedby for errors, and checking color contrast"
       ]
     }
+  },
+  {
+    "name": "envguard-production-readiness",
+    "pack": "production",
+    "description": "Guides comprehensive, evidence-based application production readiness assessments across environment configuration, build and tests, security posture, API contracts, database persistence, and operational reliability.",
+    "canonicalDir": "packs/production/skills/envguard-production-readiness",
+    "version": "1.0.0",
+    "supportedHosts": ["codex", "antigravity", "claude-code", "cursor"],
+    "requiredTools": ["read_file", "write_file", "run_command"],
+    "requiredPermissions": ["read-only", "workspace-write"],
+    "triggers": {
+      "when": [
+        "Evaluating an application, service, or API for deployment readiness before shipping to production",
+        "Running the standalone EnvGuard Readiness Auditor (tools/readiness-auditor.mjs) on a project",
+        "Auditing operational readiness including health checks, graceful shutdown, Docker, and CI/CD"
+      ],
+      "whenNot": [
+        "Designing high-level distributed systems architecture from scratch before code exists",
+        "Setting up initial EnvGuard environment validation for the first time",
+        "Conducting deep WCAG screen reader accessibility testing exclusively"
+      ],
+      "suggestedPrompts": [
+        "Analyze my full-stack application for production readiness with envguard-production-readiness",
+        "Run the readiness auditor on our backend API in read-only mode and list all blocking issues",
+        "Generate a complete production readiness report with authorized test execution using --allow-exec"
+      ]
+    }
   }
 ]
 

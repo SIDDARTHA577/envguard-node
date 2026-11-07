@@ -1,0 +1,22 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Broken RPC API",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/getTasks": {
+      "get": {
+        "summary": "Non-RESTful action verb endpoint",
+        "responses": {
+          "200": { "description": "Returns raw array without pagination or error models" }
+        }
+      }
+    },
+    "/api/delete_task": {
+      "post": {
+        "summary": "POST used for deletion with action verb"
+      }
+    }
+  }
+}
