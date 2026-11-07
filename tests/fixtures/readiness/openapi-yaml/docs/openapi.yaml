@@ -21,3 +21,4 @@ components:
           type: integer
         title:
           type: string
+

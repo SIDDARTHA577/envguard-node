@@ -466,8 +466,8 @@ export function isPathIgnoredByRules(rules, filePath) {
     } else if (pat.endsWith('/') && (norm.startsWith(pat) || norm + '/' === pat)) {
       matches = true;
     } else if (pat.includes('*')) {
-      const regexStr = '^' + pat.replace(/\./g, '\\.').replace(/\*/g, '.*') + '$';
-      const re = new RegExp(regexStr);
+      const escaped = pat.replace(/[\\^$+?.()|[\]{}]/g, '\\$&').replace(/\*/g, '.*');
+      const re = new RegExp(`^${escaped}$`);
       matches = re.test(norm) || re.test(base);
     } else if (norm.includes(pat) || base === pat) {
       matches = true;
