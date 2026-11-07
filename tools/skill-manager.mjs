@@ -229,6 +229,45 @@ export function resolveTargetDirForHost(skillName, targetHost) {
 }
 
 /**
+ * Recursively copies a directory's contents.
+ */
+export function copyDirectoryRecursive(srcDir, destDir) {
+  if (!fs.existsSync(srcDir)) return;
+  if (!fs.existsSync(destDir)) fs.mkdirSync(destDir, { recursive: true });
+  for (const entry of fs.readdirSync(srcDir, { withFileTypes: true })) {
+    const srcPath = path.join(srcDir, entry.name);
+    const destPath = path.join(destDir, entry.name);
+    if (entry.isDirectory()) {
+      copyDirectoryRecursive(srcPath, destPath);
+    } else if (entry.isFile()) {
+      fs.copyFileSync(srcPath, destPath);
+    }
+  }
+}
+
+/**
+ * Collects all source files belonging to a skill's canonical directory.
+ */
+export function collectSkillFiles(skillCanonicalDir) {
+  const files = [];
+  function walk(currentDir) {
+    if (!fs.existsSync(currentDir)) return;
+    const entries = fs.readdirSync(currentDir, { withFileTypes: true });
+    for (const entry of entries) {
+      const full = path.join(currentDir, entry.name);
+      if (entry.isDirectory()) {
+        walk(full);
+      } else if (entry.isFile()) {
+        const relToSkill = path.relative(skillCanonicalDir, full).replace(/\\/g, '/');
+        files.push({ relPath: relToSkill, fullPath: full });
+      }
+    }
+  }
+  walk(skillCanonicalDir);
+  return files;
+}
+
+/**
  * Synchronizes canonical skills to .agents/skills/ and updates host manifests.
  * Also supports checking synchronization (--check) without modifying disk.
  */
@@ -472,64 +511,67 @@ export function installSkills({
 
   for (const skill of targetSkills) {
     const srcDir = path.join(repoRoot, skill.canonicalDir);
-    const srcSkill = path.join(srcDir, 'SKILL.md');
+    const skillFiles = collectSkillFiles(srcDir);
 
-    if (!fs.existsSync(srcSkill)) {
-      plan.errors.push(`Canonical skill file missing: ${srcSkill}`);
+    if (skillFiles.length === 0) {
+      plan.errors.push(`Canonical skill files missing in: ${srcDir}`);
       continue;
     }
 
-    const content = fs.readFileSync(srcSkill, 'utf8');
-    const hash = sha256(content);
-
     const targetRelDir = resolveTargetDirForHost(skill.name, targetHost);
     const targetDestDir = assertSafeDestination(safeDestRoot, targetRelDir);
-    const targetFilePath = assertSafeDestination(targetDestDir, 'SKILL.md');
-    const relativeToDest = path.relative(safeDestRoot, targetFilePath).replace(/\\/g, '/');
 
-    if (fs.existsSync(targetFilePath)) {
-      const existingContent = fs.readFileSync(targetFilePath, 'utf8');
-      const existingHash = sha256(existingContent);
+    for (const file of skillFiles) {
+      const content = fs.readFileSync(file.fullPath, 'utf8');
+      const hash = sha256(content);
 
-      if (existingHash === hash) {
-        plan.skipped.push({
-          skill: skill.name,
-          path: relativeToDest,
-          reason: 'already up to date',
-        });
-        continue;
+      const targetFilePath = assertSafeDestination(targetDestDir, file.relPath);
+      const relativeToDest = path.relative(safeDestRoot, targetFilePath).replace(/\\/g, '/');
+
+      if (fs.existsSync(targetFilePath)) {
+        const existingContent = fs.readFileSync(targetFilePath, 'utf8');
+        const existingHash = sha256(existingContent);
+
+        if (existingHash === hash) {
+          plan.skipped.push({
+            skill: skill.name,
+            path: relativeToDest,
+            reason: 'already up to date',
+          });
+          continue;
+        }
+
+        // If file exists and differs, verify ownership and modification status
+        const skillRecord = metadata.skills[skill.name];
+        const isManaged = skillRecord?.files?.some((f) => f.path === relativeToDest);
+
+        if (!isManaged && !force) {
+          plan.errors.push(
+            `Conflict: "${relativeToDest}" already exists and is not managed by EnvGuard. Use --force to overwrite.`
+          );
+          continue;
+        }
+
+        // If it IS managed but the user has modified it, protect it unless forced
+        const managedFileRecord = skillRecord?.files?.find((f) => f.path === relativeToDest);
+        if (managedFileRecord && managedFileRecord.sha256 !== existingHash && !force) {
+          plan.errors.push(
+            `Conflict: "${relativeToDest}" has been modified by the developer since installation. Use --force to overwrite.`
+          );
+          continue;
+        }
       }
 
-      // If file exists and differs, verify ownership and modification status
-      const skillRecord = metadata.skills[skill.name];
-      const isManaged = skillRecord?.files?.some((f) => f.path === relativeToDest);
-
-      if (!isManaged && !force) {
-        plan.errors.push(
-          `Conflict: "${relativeToDest}" already exists and is not managed by EnvGuard. Use --force to overwrite.`
-        );
-        continue;
-      }
-
-      // If it IS managed but the user has modified it, protect it unless forced
-      const managedFileRecord = skillRecord?.files?.find((f) => f.path === relativeToDest);
-      if (managedFileRecord && managedFileRecord.sha256 !== existingHash && !force) {
-        plan.errors.push(
-          `Conflict: "${relativeToDest}" has been modified by the developer since installation. Use --force to overwrite.`
-        );
-        continue;
-      }
+      plan.actions.push({
+        action: 'install',
+        skill: skill.name,
+        src: file.fullPath,
+        dest: targetFilePath,
+        relPath: relativeToDest,
+        content,
+        hash,
+      });
     }
-
-    plan.actions.push({
-      action: 'install',
-      skill: skill.name,
-      src: srcSkill,
-      dest: targetFilePath,
-      relPath: relativeToDest,
-      content,
-      hash,
-    });
   }
 
   if (plan.errors.length > 0) {
@@ -562,9 +604,33 @@ export function installSkills({
           };
         }
 
-        metadata.skills[item.skill].files = [
-          { path: item.relPath, sha256: item.hash },
-        ];
+        const existingIdx = metadata.skills[item.skill].files.findIndex((f) => f.path === item.relPath);
+        if (existingIdx >= 0) {
+          metadata.skills[item.skill].files[existingIdx] = { path: item.relPath, sha256: item.hash };
+        } else {
+          metadata.skills[item.skill].files.push({ path: item.relPath, sha256: item.hash });
+        }
+      }
+
+      // Also ensure any skipped files that were already up to date remain tracked
+      for (const skipped of plan.skipped) {
+        if (!metadata.skills[skipped.skill]) {
+          metadata.skills[skipped.skill] = {
+            installedAt: new Date().toISOString(),
+            targetHost,
+            files: [],
+          };
+        }
+        const fullSkipped = path.join(safeDestRoot, skipped.path);
+        if (fs.existsSync(fullSkipped)) {
+          const hash = sha256(fs.readFileSync(fullSkipped, 'utf8'));
+          const existingIdx = metadata.skills[skipped.skill].files.findIndex((f) => f.path === skipped.path);
+          if (existingIdx >= 0) {
+            metadata.skills[skipped.skill].files[existingIdx] = { path: skipped.path, sha256: hash };
+          } else {
+            metadata.skills[skipped.skill].files.push({ path: skipped.path, sha256: hash });
+          }
+        }
       }
 
       writeMetadataAtomic(metadataPath, metadata);
@@ -686,13 +752,20 @@ export function uninstallSkills({
     for (const item of actions) {
       if (fs.existsSync(item.path)) {
         fs.unlinkSync(item.path);
-        // Clean empty parent directory if safe
-        const parent = path.dirname(item.path);
-        try {
-          if (fs.readdirSync(parent).length === 0) {
-            fs.rmdirSync(parent);
+        // Clean empty parent directories recursively up to safeDestRoot
+        let parent = path.dirname(item.path);
+        while (parent !== safeDestRoot && parent.startsWith(safeDestRoot)) {
+          try {
+            if (fs.readdirSync(parent).length === 0) {
+              fs.rmdirSync(parent);
+              parent = path.dirname(parent);
+            } else {
+              break;
+            }
+          } catch {
+            break;
           }
-        } catch {}
+        }
       }
     }
 
