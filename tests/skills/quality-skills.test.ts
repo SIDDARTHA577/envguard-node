@@ -272,7 +272,7 @@ describe('Phase 2B Engineering Quality Skills & Fixture Evaluations', () => {
     });
 
     it('evaluates defective service code and catches SQL injection, ReDoS, memory leak, and async forEach', () => {
-      const source = fs.readFileSync(path.join(fixtureDir, 'service.defective.ts'), 'utf8');
+      const source = fs.readFileSync(path.join(fixtureDir, 'service.defective.txt'), 'utf8');
       const result = auditCodeSource(source);
       expect(result.clean).toBe(false);
       expect(result.findings).toContain('SQL Injection Risk: unparameterized query concatenation detected');
