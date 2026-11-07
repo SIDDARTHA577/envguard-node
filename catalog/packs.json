@@ -1,0 +1,43 @@
+[
+  {
+    "id": "core",
+    "name": "EnvGuard Core Configuration & Security",
+    "description": "Environment variable auditing, onboarding, migration, CI validation, and secret handling security review skills.",
+    "skills": [
+      "envguard-audit",
+      "envguard-setup",
+      "envguard-review",
+      "envguard-ci",
+      "envguard-migrate"
+    ]
+  },
+  {
+    "id": "fullstack",
+    "name": "EnvGuard Full-Stack Engineering",
+    "description": "Comprehensive full-stack application development skills covering frontend, backend, UI design, database engineering, system design, API contracts, and integration.",
+    "skills": [
+      "envguard-frontend",
+      "envguard-ui-design",
+      "envguard-backend",
+      "envguard-database",
+      "envguard-system-design",
+      "envguard-api-design",
+      "envguard-fullstack-integration"
+    ]
+  },
+  {
+    "id": "production",
+    "name": "EnvGuard Production Readiness & Verification",
+    "description": "Production engineering, automated testing, security audits, accessibility, DevOps pipelines, observability, load testing, and deployment readiness reviews.",
+    "skills": [
+      "envguard-test-engineer",
+      "envguard-security-audit",
+      "envguard-accessibility",
+      "envguard-devops",
+      "envguard-observability",
+      "envguard-production-review",
+      "envguard-load-test"
+    ]
+  }
+]
+

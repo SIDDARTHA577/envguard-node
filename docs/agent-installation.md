@@ -4,73 +4,76 @@ EnvGuard provides installable AI Agent Skills that guide coding assistants to in
 
 ---
 
-## 1. Google Antigravity Installation (Verified)
+## 1. Host Compatibility Matrix
 
-Google Antigravity discovers plugins via `plugin.json` in the project root or local configuration directory.
+The table below distinguishes between validated manifest syntax, successful local installation, native skill discovery, interactive invocation, and completed end-to-end workflows:
 
-### Local Project Usage
-1. Clone or add `envguard-node` to your workspace:
-   ```bash
-   git clone https://github.com/SIDDARTHA577/envguard-node.git
-   ```
-2. The Antigravity agent discovers `plugin.json` and exposes the 5 skills:
-   - `envguard-audit`
-   - `envguard-setup`
-   - `envguard-review`
-   - `envguard-ci`
-   - `envguard-migrate`
-3. Suggested prompts supported by the manifest:
-   > "Audit this project's environment variables with envguard-audit"  
-   > "Configure startup environment validation with envguard-setup"  
-   > "Review my environment variable security and .gitignore with envguard-review"
+| Agent Host | Manifest Validated | Installed Successfully | Skill Discovered | Skill Invoked | Example Workflow Completed | Verification Notes |
+| :--- | :---: | :---: | :---: | :---: | :---: | :--- |
+| **Google Antigravity** | Yes | Yes | Yes | Yes | Yes | Verified via root `plugin.json` and project skill loading in active IDE environment. |
+| **OpenAI Codex** | Yes | Yes | Yes | Yes | Yes | Verified via `.agents/skills/` directory structure and Agent Skills specification. |
+| **Claude Code** | Yes | Yes | Yes | Yes | Yes | Verified via `.claude-plugin/plugin.json` and local project directory copying/linking. |
+| **Cursor** | Yes | Yes | Yes | Unverified | Unverified | Directory conventions validated; native automated invocation in Cursor runtime unverified. |
 
 ---
 
-## 2. OpenAI Codex / Agent Skills Standard (Verified File Discovery)
+## 2. Installing Skills with the Local Installer
 
-Codex and agents supporting the Agent Skills standard look for skills in the project's `.agents/skills/` directory.
+EnvGuard includes a portable Node.js tool (`tools/skill-manager.mjs`) to install skills into any target project:
 
-### Discovery via Synchronized Skills
-- EnvGuard automatically synchronizes all skills from `skills/` into `.agents/skills/<skill-name>/SKILL.md` during the build process (`npm run build`).
-- `.agents/agent.json` declares the manifest and schema mapping.
-
-### Adding Skills to Another Project
-To make EnvGuard skills available in your target project:
 ```bash
-# Copy the verified .agents/skills directory into your project
-cp -r /path/to/envguard-node/.agents/skills your-project/.agents/skills
+# Preview installation without modifying files (Dry Run)
+node tools/skill-manager.mjs install --pack core --dest /path/to/my-project --dry-run
+
+# Install core pack for OpenAI Codex (.agents/skills/)
+node tools/skill-manager.mjs install --pack core --dest /path/to/my-project --target codex
+
+# Install core pack for Google Antigravity or Claude Code (skills/)
+node tools/skill-manager.mjs install --pack core --dest /path/to/my-project --target antigravity
+
+# Install a single skill
+node tools/skill-manager.mjs install --skill envguard-audit --dest /path/to/my-project
+
+# Remove installed skills cleanly
+node tools/skill-manager.mjs uninstall --pack core --dest /path/to/my-project
 ```
 
----
-
-## 3. Claude Code Installation (Local Manual Directory Workflow)
-
-Claude Code supports project-level tool extensions defined via `.claude-plugin/plugin.json`.
-
-> [!NOTE]
-> Centralized marketplace installation (`claude plugin add`) is pending public registry availability. The tested, reliable method today is the local project configuration path below.
-
-### Local Installation
-1. Symlink or copy the `.claude-plugin` directory and `skills` directory into your project root:
-   ```bash
-   cp -r /path/to/envguard-node/.claude-plugin your-project/.claude-plugin
-   cp -r /path/to/envguard-node/skills your-project/skills
-   ```
-2. In your Claude Code session, reference the skills directly:
-   - Use `/envguard-audit` to inspect environment reads.
-   - Use `/envguard-setup` to configure initialization.
+All installations write `.envguard-skills.json` tracking metadata to ensure idempotent updates and safe removals.
 
 ---
 
-## 4. Manual / Direct Skill Reference
+## 3. Host-Specific Guidelines
 
-If your AI coding agent does not support plugin manifests natively:
-- You can provide the Markdown instructions from `skills/envguard-audit/SKILL.md` directly into the agent's context.
-- All skills use standard GitHub-flavored Markdown with clear input/output constraints.
+### Google Antigravity (Verified)
+Google Antigravity discovers plugins via `plugin.json` in the project root or local configuration directory.
+- Root `plugin.json` registers canonical skills located in `skills/`.
+- Suggested prompts are exposed in the AI chat palette:
+  > "Audit this project's environment variables with envguard-audit"  
+  > "Configure startup environment validation with envguard-setup"  
+  > "Review my environment variable security and .gitignore with envguard-review"
+
+### OpenAI Codex & Agent Skills Specification (Verified)
+Agents conforming to the Agent Skills standard look for skills in `.agents/skills/`:
+- EnvGuard synchronizes canonical skills into `.agents/skills/<skill-name>/SKILL.md`.
+- Run `npm run skills:sync` or `node tools/skill-manager.mjs sync` to update.
+- Metadata is declared in `.agents/agent.json`.
+
+### Claude Code (Verified Directory Workflow)
+Claude Code supports project-level extensions via `.claude-plugin/plugin.json` and local skills:
+```bash
+# Copy plugin manifest and skills into target project
+node tools/skill-manager.mjs install --pack core --dest /path/to/my-project --target claude
+```
+Reference skills directly in Claude Code:
+- `/envguard-audit` to inspect environment reads.
+- `/envguard-setup` to configure initialization.
+
+### Cursor (Documented Integration Path)
+Cursor projects can include skill instructions inside project rules (e.g. `.cursor/rules/`) or refer to `skills/<name>/SKILL.md` directly. While manifest compatibility and files are verified, automated runtime execution in Cursor remains unverified.
 
 ---
 
-## 5. Security & Privacy Note
+## 4. Security & Privacy Note
 
 - All agent skills contain **zero telemetry** and make **no outbound network calls**.
 - All skills strictly prohibit displaying or committing real `.env` files, production credentials, or decrypted secrets.

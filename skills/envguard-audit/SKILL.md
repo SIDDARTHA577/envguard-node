@@ -5,52 +5,76 @@ description: Scans a codebase for environment variable usage (e.g. process.env, 
 
 # `envguard-audit` Skill
 
-Use this skill when auditing a repository or onboarding a project to EnvGuard. It performs a non-destructive static scan of source code to detect environment variable references, deduce candidate types (port, url, boolean, string), and suggest a structured configuration schema.
+Scans a codebase to discover environment variable usage, deduce required types and constraints, and propose an EnvGuard schema and a synthetic `.env.example`.
 
-## Safety & Security Constraints
+## When to Trigger
+- The user requests an audit or inventory of environment variables in a project.
+- The project needs an accurate `.env.example` generated from source code.
+- Preparing to onboard an application to structured configuration validation.
 
-1. **NEVER Read or Print Real Secrets**:
-   - Do NOT display contents of local `.env`, `.env.local`, or secret files.
-   - Do NOT print actual values of environment variables in conversation output.
-2. **Deterministic & Non-Destructive**:
-   - Do NOT overwrite existing code or configuration without explicit user consent.
-   - Report uncertainty clearly when a variable's type cannot be definitively determined from source code.
-3. **Safe Recommendations**:
-   - All generated `.env.example` templates MUST use synthetic placeholder values (e.g. `postgres://user:pass@localhost:5432/mydb`).
+## When NOT to Trigger
+- Modifying or refactoring code without prior discovery (use `envguard-migrate`).
+- Setting up build/runtime dependencies (use `envguard-setup`).
+- The project does not use environment variables or runtime configurations.
 
----
+## Supported Projects & Environments
+- Node.js applications (CommonJS or ESM).
+- TypeScript and JavaScript codebases.
+- Monorepos and standalone repositories.
+- Web frameworks: Express, Fastify, Next.js, Vite, NestJS, Koa.
 
-## Workflow Steps
+## Required Tools & Permissions
+- Tools: File search / grep, file reading (`read_file`, `run_command`).
+- Permissions: Read-only access to workspace source files. No network or write access required.
 
-### Step 1: Scan for Environment References
-Grep or search for standard Node.js / JavaScript environment access patterns:
+## Expected Inputs
+- Project root path containing source files (`src/`, `lib/`, `app/`, etc.).
+- Optional: existing configuration files (`.env.example`, `package.json`, `tsconfig.json`).
+
+## Step-by-Step Workflow
+
+### Step 1: Scan Source Files for Environment References
+Search for environment variable access patterns across all source files:
 - `process.env.VARIABLE_NAME`
 - `process.env['VARIABLE_NAME']`
 - `import.meta.env.VARIABLE_NAME`
 
-### Step 2: Analyze Inferred Types
-Examine surrounding code to infer constraints:
-- Passed to `Number()`, `parseInt()`, or used as port -> `s.port()` or `s.integer()`
-- Passed to `new URL()`, `fetch()`, or database clients (`pg`, `prisma`, `mongoose`) -> `s.url()`
-- Compared against `'true'`, `'1'`, or boolean checks -> `s.boolean()`
-- Checked against specific string literals -> `s.enum([...])`
-- High-entropy tokens, API keys, passwords -> mark `.sensitive()`
+### Step 2: Deduce Types & Sensitivity Heuristics
+Analyze surrounding code for usage hints:
+- Numeric conversions (`Number(...)`, `parseInt(...)`) or port assignments -> `s.port()` or `s.integer()`
+- Protocol checks or URL instantiation (`new URL(...)`, DB connection strings) -> `s.url()`
+- Boolean comparisons (`=== 'true'`, `=== '1'`) -> `s.boolean()`
+- Specific finite values or string checks -> `s.enum([...])`
+- High-entropy tokens, passwords, keys (`SECRET`, `TOKEN`, `KEY`, `PASSWORD`, `AUTH`) -> mark `.sensitive()`
 
-### Step 3: Present Proposed Schema and `.env.example`
-Provide the developer with a proposed `envguard.config.json` or `envguard.config.js` and matching `.env.example`.
+### Step 3: Check Existing Configuration Files
+- Inspect `.env.example` if present to identify documented keys.
+- Check `.gitignore` to ensure real `.env` files are excluded.
 
----
+### Step 4: Generate Recommendations
+- Propose an EnvGuard schema definition.
+- Propose a clean `.env.example` template with synthetic placeholders.
 
-## Realistic Example Output
+## Validation Steps
+- Verify that every discovered environment key in source code is mapped in the proposed schema.
+- Confirm all sensitive keys are flagged with `.sensitive()`.
+- Ensure no real credentials appear in the proposed `.env.example`.
 
-```typescript
-import { s, defineSchema } from 'envguard-node';
+## Expected Outputs
+- An inventory table of all discovered environment variables with inferred types.
+- A proposed TypeScript or JSON EnvGuard schema.
+- A proposed `.env.example` file using purely synthetic placeholder values.
 
-export default defineSchema({
-  PORT: s.port().default(3000),
-  NODE_ENV: s.enum(['development', 'production', 'test']).default('development'),
-  DATABASE_URL: s.url({ protocols: ['postgres:', 'postgresql:'] }).sensitive().describe('Database connection URL'),
-  STRIPE_SECRET_KEY: s.string({ min: 24 }).sensitive().describe('Payment provider API key'),
-});
-```
+## Failure Handling
+- If source files cannot be read or parsed, report the affected paths and request permission.
+- If a variable's type is ambiguous, default to `s.string()` and explain the assumption.
 
+## Safety & Privacy Boundaries
+- **NEVER** inspect, read, or print real production credentials or local `.env` values.
+- **NEVER** write or overwrite workspace files during an audit without explicit consent.
+- **NEVER** transmit repository source code or environment names externally.
+
+## Example User Prompts
+- "Audit this project's environment variables with envguard-audit"
+- "Scan my codebase for all process.env calls and suggest an EnvGuard schema"
+- "Generate a safe .env.example template for this repository"
