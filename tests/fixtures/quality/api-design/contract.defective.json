@@ -1,0 +1,35 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Defective Action-Verb API",
+    "version": "0.0.1"
+  },
+  "paths": {
+    "/api/getTasks": {
+      "get": {
+        "summary": "Fetch all tasks unconditionally",
+        "responses": {
+          "200": {
+            "description": "Returns everything without pagination or error modeling"
+          }
+        }
+      }
+    },
+    "/api/create_task": {
+      "post": {
+        "summary": "Create task with RPC action verb and 200 error code",
+        "responses": {
+          "200": {
+            "description": "Returns { success: false, error: 'Failed' } on error instead of 4xx"
+          }
+        }
+      }
+    },
+    "/api/delete_task_by_id": {
+      "post": {
+        "summary": "POST used for deletion with action verb"
+      }
+    }
+  }
+}
+

@@ -1,0 +1,20 @@
+{
+  "name": "defective-tokens",
+  "version": "0.1.0",
+  "tokens": {
+    "colors": {
+      "randomBlue": "#1234aa",
+      "myGreen": "#00ff00",
+      "boxColor": "#dedede"
+    },
+    "spacings": {
+      "aLittle": "7px",
+      "someMore": "19px",
+      "aLot": "37px"
+    },
+    "fonts": {
+      "title": "Arial 22px"
+    }
+  }
+}
+

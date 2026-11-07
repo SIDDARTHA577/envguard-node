@@ -1,0 +1,291 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "EnvGuard Full-Stack Golden Path Task API",
+    "version": "1.0.0",
+    "description": "Production reference RESTful API specification adhering to envguard-api-design with RFC 7807 error modeling."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000/api",
+      "description": "Local development server"
+    }
+  ],
+  "paths": {
+    "/tasks": {
+      "get": {
+        "summary": "List tasks",
+        "description": "Retrieve tasks filtered by status or priority",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["todo", "in_progress", "done"]
+            }
+          },
+          {
+            "name": "priority",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["low", "medium", "high", "urgent"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of tasks retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["data"],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Task"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create task",
+        "description": "Create a new task with title, description, and priority",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTaskRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Task created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["data"],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Task"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tasks/{id}": {
+      "get": {
+        "summary": "Get task by ID",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Task found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["data"],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Task"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Task not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Update task partially",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTaskRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Task updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["data"],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Task"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Task not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete task",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Task deleted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["data"],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "deleted": { "type": "boolean" },
+                        "id": { "type": "string" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Task not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Task": {
+        "type": "object",
+        "required": ["id", "title", "status", "priority", "createdAt", "updatedAt"],
+        "properties": {
+          "id": { "type": "string" },
+          "title": { "type": "string" },
+          "description": { "type": "string" },
+          "status": { "type": "string", "enum": ["todo", "in_progress", "done"] },
+          "priority": { "type": "string", "enum": ["low", "medium", "high", "urgent"] },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "CreateTaskRequest": {
+        "type": "object",
+        "required": ["title"],
+        "properties": {
+          "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "description": { "type": "string", "maxLength": 1000 },
+          "priority": { "type": "string", "enum": ["low", "medium", "high", "urgent"], "default": "medium" }
+        }
+      },
+      "UpdateTaskRequest": {
+        "type": "object",
+        "properties": {
+          "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "description": { "type": "string", "maxLength": 1000 },
+          "status": { "type": "string", "enum": ["todo", "in_progress", "done"] },
+          "priority": { "type": "string", "enum": ["low", "medium", "high", "urgent"] }
+        }
+      },
+      "ProblemDetails": {
+        "type": "object",
+        "required": ["type", "title", "status", "detail"],
+        "properties": {
+          "type": { "type": "string", "format": "uri" },
+          "title": { "type": "string" },
+          "status": { "type": "integer" },
+          "detail": { "type": "string" },
+          "instance": { "type": "string" }
+        }
+      }
+    }
+  }
+}
+

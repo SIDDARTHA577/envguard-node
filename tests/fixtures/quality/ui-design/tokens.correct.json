@@ -1,0 +1,76 @@
+{
+  "name": "envguard-design-tokens",
+  "version": "1.0.0",
+  "tokens": {
+    "color": {
+      "neutral": {
+        "50": "#f8fafc",
+        "100": "#f1f5f9",
+        "200": "#e2e8f0",
+        "500": "#64748b",
+        "800": "#1e293b",
+        "900": "#0f172a"
+      },
+      "brand": {
+        "500": "#3b82f6",
+        "600": "#2563eb",
+        "700": "#1d4ed8"
+      },
+      "semantic": {
+        "success": "#16a34a",
+        "warning": "#d97706",
+        "error": "#dc2626",
+        "info": "#0284c7"
+      },
+      "surface": {
+        "light": "#ffffff",
+        "dark": "#0f172a"
+      },
+      "text": {
+        "light": "#0f172a",
+        "dark": "#f8fafc",
+        "mutedLight": "#64748b",
+        "mutedDark": "#94a3b8"
+      }
+    },
+    "spacing": {
+      "base": 4,
+      "scale": {
+        "1": "4px",
+        "2": "8px",
+        "3": "12px",
+        "4": "16px",
+        "6": "24px",
+        "8": "32px",
+        "12": "48px"
+      }
+    },
+    "typography": {
+      "fontFamily": {
+        "sans": "Inter, system-ui, -apple-system, sans-serif",
+        "mono": "ui-monospace, SFMono-Regular, monospace"
+      },
+      "fontSize": {
+        "xs": { "size": "12px", "lineHeight": "16px" },
+        "sm": { "size": "14px", "lineHeight": "20px" },
+        "base": { "size": "16px", "lineHeight": "24px" },
+        "lg": { "size": "18px", "lineHeight": "28px" },
+        "xl": { "size": "20px", "lineHeight": "28px" },
+        "2xl": { "size": "24px", "lineHeight": "32px" }
+      }
+    },
+    "radii": {
+      "sm": "4px",
+      "md": "8px",
+      "lg": "12px",
+      "full": "9999px"
+    },
+    "breakpoints": {
+      "sm": "640px",
+      "md": "768px",
+      "lg": "1024px",
+      "xl": "1280px"
+    }
+  }
+}
+
