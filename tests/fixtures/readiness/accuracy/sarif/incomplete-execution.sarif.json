@@ -1,0 +1,25 @@
+{
+  "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "FailedScanner",
+          "version": "1.0.0"
+        }
+      },
+      "invocations": [
+        {
+          "executionSuccessful": false,
+          "toolExecutionNotifications": [
+            {
+              "message": { "text": "Scanner crashed due to out-of-memory error during AST parsing." }
+            }
+          ]
+        }
+      ],
+      "results": []
+    }
+  ]
+}

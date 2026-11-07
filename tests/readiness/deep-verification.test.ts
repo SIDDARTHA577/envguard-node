@@ -45,7 +45,7 @@ describe('Phase 4.1: Deep Web, Backend & Database Verification', () => {
       const migrationFinding = report.findings.find((f) => f.id === 'DB-002');
 
       expect(migrationFinding?.status).toBe('PASS');
-      expect(migrationFinding?.title).toContain('Rollback Support Present');
+      expect(migrationFinding?.title).toContain('Declarative Database Migrations Configured');
     });
 
     it('verifies secure session and cookie configurations (SEC-004 PASS)', () => {
@@ -64,12 +64,12 @@ describe('Phase 4.1: Deep Web, Backend & Database Verification', () => {
       expect(secretFinding?.title).toContain('Authentication Secrets Loaded From Environment');
     });
 
-    it('verifies multi-tenant data isolation and tenantId filters (SEC-006 PASS)', () => {
+    it('verifies multi-tenant data isolation heuristics (SEC-006 MANUAL_REVIEW)', () => {
       const report = runReadinessAudit({ projectDir, allowExec: false });
       const tenantFinding = report.findings.find((f) => f.id === 'SEC-006');
 
-      expect(tenantFinding?.status).toBe('PASS');
-      expect(tenantFinding?.title).toContain('Multi-Tenant Data Isolation Filters Enforced');
+      expect(tenantFinding?.status).toBe('MANUAL_REVIEW');
+      expect(tenantFinding?.title).toContain('Multi-Tenant Data Isolation Requires Runtime Boundary Verification');
     });
 
     it('verifies route authorization middleware guardrails (SEC-007 PASS)', () => {
@@ -235,7 +235,7 @@ describe('Phase 4.1: Deep Web, Backend & Database Verification', () => {
       expect(findings.length).toBe(3);
 
       // Error level with security-severity 9.8 maps to FAIL + critical
-      const sqliFinding = findings.find((f) => f.id === 'SARIF-js/sql-injection');
+      const sqliFinding = findings.find((f) => f.checkId === 'js/sql-injection');
       expect(sqliFinding?.status).toBe('FAIL');
       expect(sqliFinding?.severity).toBe('critical');
       expect(sqliFinding?.toolName).toBe('CodeQL');
@@ -244,14 +244,14 @@ describe('Phase 4.1: Deep Web, Backend & Database Verification', () => {
       expect(sqliFinding?.evidence?.snippet).toContain('db.query');
 
       // Warning level maps to WARNING + medium
-      const rateLimitFinding = findings.find((f) => f.id === 'SARIF-js/missing-rate-limiting');
+      const rateLimitFinding = findings.find((f) => f.checkId === 'js/missing-rate-limiting');
       expect(rateLimitFinding?.status).toBe('WARNING');
       expect(rateLimitFinding?.severity).toBe('medium');
       expect(rateLimitFinding?.category).toBe('api');
 
-      // Note level maps to PASS + info
-      const noteFinding = findings.find((f) => f.id === 'SARIF-js/debugger-statement');
-      expect(noteFinding?.status).toBe('PASS');
+      // Note level maps to INFORMATIONAL + info per OASIS SARIF v2.1.0 specification
+      const noteFinding = findings.find((f) => f.checkId === 'js/debugger-statement');
+      expect(noteFinding?.status).toBe('INFORMATIONAL');
       expect(noteFinding?.severity).toBe('info');
     });
 
@@ -263,7 +263,7 @@ describe('Phase 4.1: Deep Web, Backend & Database Verification', () => {
       });
 
       // Contains imported SARIF finding
-      const sarifFinding = report.findings.find((f) => f.id === 'SARIF-js/sql-injection');
+      const sarifFinding = report.findings.find((f) => f.checkId === 'js/sql-injection');
       expect(sarifFinding).toBeDefined();
       expect(sarifFinding?.status).toBe('FAIL');
 

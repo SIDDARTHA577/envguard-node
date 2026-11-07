@@ -1,0 +1,191 @@
+{
+  "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "ComprehensiveScanner",
+          "version": "2.4.0",
+          "rules": [
+            {
+              "id": "RULE-PASS-01",
+              "name": "PassedCheck",
+              "shortDescription": { "text": "Passing security verification" }
+            },
+            {
+              "id": "RULE-FAIL-ERR-01",
+              "name": "CriticalSqlInjection",
+              "shortDescription": { "text": "SQL injection detected in query string" },
+              "properties": {
+                "security-severity": "9.5",
+                "tags": ["security", "sql", "database"]
+              }
+            },
+            {
+              "id": "RULE-FAIL-WARN-01",
+              "name": "MissingRateLimit",
+              "shortDescription": { "text": "Endpoint missing rate limit" },
+              "properties": {
+                "tags": ["api", "security"]
+              }
+            },
+            {
+              "id": "RULE-FAIL-NOTE-01",
+              "name": "InformationalNoteIssue",
+              "shortDescription": { "text": "Code optimization recommendation" },
+              "properties": {
+                "tags": ["performance"]
+              }
+            },
+            {
+              "id": "RULE-INFO-01",
+              "name": "InformationalOnlyFinding",
+              "shortDescription": { "text": "Diagnostic metadata trace" }
+            },
+            {
+              "id": "RULE-REVIEW-01",
+              "name": "PotentialPrivilegeEscalation",
+              "shortDescription": { "text": "Role check requires human verification" }
+            },
+            {
+              "id": "RULE-NA-01",
+              "name": "NotApplicableContainerCheck",
+              "shortDescription": { "text": "Kubernetes rule not applicable" }
+            },
+            {
+              "id": "RULE-COLLISION-01",
+              "name": "DuplicateRuleIdTest",
+              "shortDescription": { "text": "Finding for duplicate rule testing" }
+            }
+          ]
+        }
+      },
+      "invocations": [
+        {
+          "executionSuccessful": true
+        }
+      ],
+      "results": [
+        {
+          "ruleId": "RULE-PASS-01",
+          "kind": "pass",
+          "level": "none",
+          "message": { "text": "All parameters properly escaped." },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": { "uri": "src/utils/sanitizer.ts" },
+                "region": { "startLine": 12 }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "RULE-FAIL-ERR-01",
+          "kind": "fail",
+          "level": "error",
+          "message": { "text": "Direct user input interpolated into SQL query." },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": { "uri": "src/db/orders.ts" },
+                "region": { "startLine": 88, "snippet": { "text": "query(`SELECT * FROM orders WHERE id = '${id}'`)" } }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "RULE-FAIL-WARN-01",
+          "kind": "fail",
+          "level": "warning",
+          "message": { "text": "Authentication route lacks abuse throttling." },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": { "uri": "src/routes/auth.ts" },
+                "region": { "startLine": 25 }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "RULE-FAIL-NOTE-01",
+          "kind": "fail",
+          "level": "note",
+          "message": { "text": "Consider precompiling regex pattern." },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": { "uri": "src/utils/regex.ts" },
+                "region": { "startLine": 5 }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "RULE-INFO-01",
+          "kind": "informational",
+          "level": "none",
+          "message": { "text": "Compiler emitted target ES2022." },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": { "uri": "tsconfig.json" },
+                "region": { "startLine": 4 }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "RULE-REVIEW-01",
+          "kind": "review",
+          "level": "warning",
+          "message": { "text": "Dynamic role evaluation requires manual approval." },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": { "uri": "src/middleware/rbac.ts" },
+                "region": { "startLine": 34 }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "RULE-NA-01",
+          "kind": "notApplicable",
+          "level": "none",
+          "message": { "text": "No Kubernetes manifest in workspace." }
+        },
+        {
+          "ruleId": "RULE-COLLISION-01",
+          "kind": "fail",
+          "level": "warning",
+          "message": { "text": "First occurrence of collision test in file A." },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": { "uri": "src/fileA.ts" },
+                "region": { "startLine": 10 }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "RULE-COLLISION-01",
+          "kind": "fail",
+          "level": "warning",
+          "message": { "text": "Second occurrence of collision test in file B." },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": { "uri": "src/fileB.ts" },
+                "region": { "startLine": 20 }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

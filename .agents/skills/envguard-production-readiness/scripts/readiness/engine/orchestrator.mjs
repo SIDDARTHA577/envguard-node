@@ -150,6 +150,7 @@ export function runReadinessAudit({
     pass: filteredFindings.filter((f) => f.status === 'PASS').length,
     fail: filteredFindings.filter((f) => f.status === 'FAIL').length,
     warning: filteredFindings.filter((f) => f.status === 'WARNING').length,
+    informational: filteredFindings.filter((f) => f.status === 'INFORMATIONAL').length,
     notRun: filteredFindings.filter((f) => f.status === 'NOT_RUN').length,
     manualReview: filteredFindings.filter((f) => f.status === 'MANUAL_REVIEW').length,
     notApplicable: filteredFindings.filter((f) => f.status === 'NOT_APPLICABLE').length,

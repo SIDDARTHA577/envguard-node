@@ -1,0 +1,35 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Organization {
+  id       String    @id @default(uuid())
+  name     String
+  members  Member[]
+  projects Project[]
+}
+
+// Leftmost prefix correctly covers foreign key organizationId
+model Member {
+  id             String       @id @default(uuid())
+  organizationId String
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId, createdAt])
+}
+
+// Leftmost prefix is createdAt, so foreign key organizationId is NOT covered
+model Project {
+  id             String       @id @default(uuid())
+  organizationId String
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([createdAt, organizationId])
+}

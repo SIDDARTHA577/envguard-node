@@ -513,6 +513,13 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
       );
     } else {
       let insecureCookieFinding = null;
+      let secureCookieDetected = false;
+      let hasCookieUsage = false;
+      const cookiePkgs = ['cookie-parser', 'express-session', 'fastify-cookie', '@fastify/cookie', 'cookies', 'cookie-session'];
+      if (cookiePkgs.some((p) => deps[p])) {
+        hasCookieUsage = true;
+      }
+
       for (const relFile of files) {
         if (
           (relFile.endsWith('.ts') || relFile.endsWith('.js') || relFile.endsWith('.mjs') || relFile.endsWith('.cjs')) &&
@@ -523,6 +530,9 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
           const full = path.join(projectDir, relFile);
           try {
             const content = fs.readFileSync(full, 'utf8');
+            if (content.includes('.cookie(') || content.includes('cookies()') || content.includes('set-cookie')) {
+              hasCookieUsage = true;
+            }
             const lines = content.split(/\r?\n/);
             for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
               const line = lines[lineIdx];
@@ -553,6 +563,12 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
                 };
                 break;
               }
+              if (
+                /httpOnly\s*:\s*true/i.test(line) &&
+                (content.includes('secure:') || content.includes('NODE_ENV'))
+              ) {
+                secureCookieDetected = true;
+              }
             }
           } catch {}
         }
@@ -574,7 +590,41 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
               snippet: sanitizeOutput(insecureCookieFinding.snippet),
             },
             checkMethod: 'static_analysis',
-            recommendation: 'Configure session cookies with httpOnly: true, secure: true (in production), and sameSite: "lax" or "strict".',
+            recommendation: 'Configure session cookies with httpOnly: true, secure: true (in production), and appropriate sameSite policy.',
+            manualVerificationRequired: false,
+            confidence: 'verified_fact',
+            targetPath: target.path,
+          })
+        );
+      } else if (!hasCookieUsage) {
+        findings.push(
+          this.createFinding({
+            id: 'SEC-004',
+            category: 'security',
+            status: 'NOT_APPLICABLE',
+            severity: 'info',
+            title: 'Session Cookie Handling Not Detected',
+            explanation: 'Application does not declare session cookie middleware or direct cookie-setting calls in analyzed source files.',
+            evidence: { file: 'package.json' },
+            checkMethod: 'static_analysis',
+            recommendation: 'If cookies are introduced, ensure httpOnly, secure in production, and sameSite flags are declared.',
+            manualVerificationRequired: false,
+            confidence: 'verified_fact',
+            targetPath: target.path,
+          })
+        );
+      } else if (secureCookieDetected) {
+        findings.push(
+          this.createFinding({
+            id: 'SEC-004',
+            category: 'security',
+            status: 'PASS',
+            severity: 'info',
+            title: 'Secure Cookie Configuration Enforced',
+            explanation: 'Detected secure cookie attributes (httpOnly: true and production-guarded secure flag) in session or response handlers.',
+            evidence: { file: 'src/' },
+            checkMethod: 'static_analysis',
+            recommendation: 'Ensure all authentication and session cookies maintain httpOnly and secure flags in production.',
             manualVerificationRequired: false,
             confidence: 'verified_fact',
             targetPath: target.path,
@@ -585,15 +635,15 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
           this.createFinding({
             id: 'SEC-004',
             category: 'security',
-            status: 'PASS',
-            severity: 'info',
-            title: 'Secure Cookie Configuration Enforced',
-            explanation: 'No insecure cookie configurations (httpOnly: false, secure: false) detected in application source code.',
+            status: 'MANUAL_REVIEW',
+            severity: 'medium',
+            title: 'Session Cookie Security Flags Require Verification',
+            explanation: 'Cookie-handling packages or calls detected, but complete production security attributes (httpOnly, secure, sameSite) could not be verified statically.',
             evidence: { file: 'src/' },
-            checkMethod: 'static_analysis',
-            recommendation: 'Ensure all authentication and session cookies maintain httpOnly and secure flags in production.',
-            manualVerificationRequired: false,
-            confidence: 'verified_fact',
+            checkMethod: 'manual_verification_required',
+            recommendation: 'Verify session middleware declares httpOnly: true, secure: process.env.NODE_ENV === "production", and sameSite: "lax" or "strict".',
+            manualVerificationRequired: true,
+            confidence: 'high_heuristic',
             targetPath: target.path,
           })
         );
@@ -604,9 +654,19 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
     // SEC-005: Hardcoded Secrets & JWT Key Safety
     // =========================================================================
     let hardcodedSecretFinding = null;
+    let insecureAlgorithmFinding = null;
+    let missingExpirationFinding = null;
+    let hasJwtUsage = false;
+    let hasStartupSecretValidation = false;
+    const jwtPkgs = ['jsonwebtoken', 'jose', 'jwt-simple', 'fast-jwt', '@nestjs/jwt'];
+    if (jwtPkgs.some((p) => deps[p])) {
+      hasJwtUsage = true;
+    }
+
+    // Check if startup schema validates JWT_SECRET with min length (e.g. EnvGuard or Zod)
     for (const relFile of files) {
       if (
-        (relFile.endsWith('.ts') || relFile.endsWith('.js') || relFile.endsWith('.mjs') || relFile.endsWith('.cjs')) &&
+        (relFile.endsWith('.ts') || relFile.endsWith('.js') || relFile.endsWith('.mjs')) &&
         !relFile.includes('.test.') &&
         !relFile.includes('.spec.') &&
         !relFile.startsWith('tests/')
@@ -614,28 +674,123 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
         const full = path.join(projectDir, relFile);
         try {
           const content = fs.readFileSync(full, 'utf8');
-          const lines = content.split(/\r?\n/);
-          for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
-            const line = lines[lineIdx];
-            if (
-              /jwt\.sign\s*\([^,]+,\s*['"][^'"]{1,64}['"]/.test(line) ||
-              /jwt\.verify\s*\([^,]+,\s*['"][^'"]{1,64}['"]/.test(line)
-            ) {
-              hardcodedSecretFinding = {
-                file: relFile,
-                line: lineIdx + 1,
-                snippet: line.trim(),
-                reason: 'Hardcoded secret literal passed directly to jsonwebtoken signing or verification method.',
-              };
-              break;
-            }
+          if (content.includes('jwt') || content.includes('jsonwebtoken') || content.includes('JWT_SECRET')) {
+            hasJwtUsage = true;
+          }
+          const nonCommentLines = content
+            .split(/\r?\n/)
+            .filter((l) => !l.trim().startsWith('//') && !l.trim().startsWith('*'));
+          const nonCommentContent = nonCommentLines.join('\n');
+          if (
+            /(?:JWT_SECRET|jwtSecret|JWT_KEY)\s*:\s*(?:s|z)\.string\(\)[^;}\n]*min\(\s*(?:3[2-9]|[4-9]\d|\d{3,})\s*\)/.test(
+              nonCommentContent
+            )
+          ) {
+            hasStartupSecretValidation = true;
           }
         } catch {}
       }
-      if (hardcodedSecretFinding) break;
     }
 
-    if (hardcodedSecretFinding) {
+    if (hasJwtUsage) {
+      for (const relFile of files) {
+        if (
+          (relFile.endsWith('.ts') || relFile.endsWith('.js') || relFile.endsWith('.mjs') || relFile.endsWith('.cjs')) &&
+          !relFile.includes('.test.') &&
+          !relFile.includes('.spec.') &&
+          !relFile.startsWith('tests/')
+        ) {
+          const full = path.join(projectDir, relFile);
+          try {
+            const content = fs.readFileSync(full, 'utf8');
+            const lines = content.split(/\r?\n/);
+            for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
+              const line = lines[lineIdx];
+              // Check algorithm: 'none'
+              if (/algorithm\s*:\s*['"]none['"]/i.test(line)) {
+                insecureAlgorithmFinding = {
+                  file: relFile,
+                  line: lineIdx + 1,
+                  snippet: line.trim(),
+                  reason: 'JWT configured with algorithm: "none", allowing signature bypass and arbitrary token forgery.',
+                };
+                break;
+              }
+              // Check hardcoded secret literal
+              if (
+                /jwt\.sign\s*\([^,]+,\s*['"][^'"]{1,64}['"]/.test(line) ||
+                /jwt\.verify\s*\([^,]+,\s*['"][^'"]{1,64}['"]/.test(line)
+              ) {
+                hardcodedSecretFinding = {
+                  file: relFile,
+                  line: lineIdx + 1,
+                  snippet: line.trim(),
+                  reason: 'Hardcoded secret literal passed directly to jsonwebtoken signing or verification method.',
+                };
+                break;
+              }
+              // Check missing expiration window on jwt.sign
+              if (
+                /jwt\.sign\s*\(/.test(line) &&
+                !line.includes('expiresIn') &&
+                !line.includes('exp')
+              ) {
+                const contextBlock = lines.slice(lineIdx, Math.min(lines.length, lineIdx + 6)).join('\n');
+                if (!contextBlock.includes('expiresIn') && !contextBlock.includes('exp:')) {
+                  missingExpirationFinding = {
+                    file: relFile,
+                    line: lineIdx + 1,
+                    snippet: line.trim(),
+                    reason: 'JWT token signing method does not declare an expiresIn option or explicit expiration timestamp.',
+                  };
+                }
+              }
+            }
+          } catch {}
+        }
+        if (insecureAlgorithmFinding || hardcodedSecretFinding) break;
+      }
+    }
+
+    if (!hasJwtUsage) {
+      findings.push(
+        this.createFinding({
+          id: 'SEC-005',
+          category: 'security',
+          status: 'NOT_APPLICABLE',
+          severity: 'info',
+          title: 'JWT Authentication Checks Not Applicable',
+          explanation: 'Project does not declare JWT libraries or signing keys in analyzed files.',
+          evidence: { file: 'package.json' },
+          checkMethod: 'static_analysis',
+          recommendation: 'If JWT authentication is added, load signing keys from environment with minimum 256-bit entropy validation.',
+          manualVerificationRequired: false,
+          confidence: 'verified_fact',
+          targetPath: target.path,
+        })
+      );
+    } else if (insecureAlgorithmFinding) {
+      findings.push(
+        this.createFinding({
+          id: 'SEC-005',
+          category: 'security',
+          status: 'FAIL',
+          severity: 'critical',
+          title: 'Insecure JWT Algorithm (none) Permitted',
+          explanation: insecureAlgorithmFinding.reason,
+          evidence: {
+            file: insecureAlgorithmFinding.file,
+            line: insecureAlgorithmFinding.line,
+            snippet: sanitizeOutput(insecureAlgorithmFinding.snippet),
+          },
+          checkMethod: 'static_analysis',
+          recommendation: 'Reject algorithm "none" and require secure asymmetric (RS256, EdDSA) or symmetric (HS256 with >= 256-bit secret) algorithms.',
+          manualVerificationRequired: false,
+          confidence: 'verified_fact',
+          targetPath: target.path,
+        })
+      );
+    } else if (hardcodedSecretFinding) {
       findings.push(
         this.createFinding({
           id: 'SEC-005',
@@ -656,7 +811,28 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
           targetPath: target.path,
         })
       );
-    } else {
+    } else if (missingExpirationFinding) {
+      findings.push(
+        this.createFinding({
+          id: 'SEC-005',
+          category: 'security',
+          status: 'WARNING',
+          severity: 'medium',
+          title: 'JWT Token Issued Without Declared Expiration Window',
+          explanation: missingExpirationFinding.reason,
+          evidence: {
+            file: missingExpirationFinding.file,
+            line: missingExpirationFinding.line,
+            snippet: sanitizeOutput(missingExpirationFinding.snippet),
+          },
+          checkMethod: 'static_analysis',
+          recommendation: 'Declare an explicit expiresIn window (e.g. expiresIn: "1h") on all issued authentication tokens.',
+          manualVerificationRequired: false,
+          confidence: 'verified_fact',
+          targetPath: target.path,
+        })
+      );
+    } else if (hasStartupSecretValidation) {
       findings.push(
         this.createFinding({
           id: 'SEC-005',
@@ -664,12 +840,29 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
           status: 'PASS',
           severity: 'info',
           title: 'Authentication Secrets Loaded From Environment',
-          explanation: 'No hardcoded JWT signing keys or static authentication secrets detected in application source code.',
-          evidence: { file: 'src/' },
+          explanation: 'No hardcoded JWT signing keys detected; signing secret is loaded from environment with startup length validation (>= 32 chars).',
+          evidence: { file: 'src/config/env.ts' },
           checkMethod: 'static_analysis',
           recommendation: 'Rotate signing keys periodically and enforce minimum key lengths for cryptographic algorithms.',
           manualVerificationRequired: false,
           confidence: 'verified_fact',
+          targetPath: target.path,
+        })
+      );
+    } else {
+      findings.push(
+        this.createFinding({
+          id: 'SEC-005',
+          category: 'security',
+          status: 'MANUAL_REVIEW',
+          severity: 'medium',
+          title: 'Authentication Secret Entropy Unverified',
+          explanation: 'JWT secret is loaded from process.env, but startup schema validation with minimum length check (>= 32 chars) was not detected.',
+          evidence: { file: 'src/' },
+          checkMethod: 'manual_verification_required',
+          recommendation: 'Enforce startup schema validation using EnvGuard (e.g. JWT_SECRET: s.string().min(32).required()) to guarantee >= 256 bits of entropy.',
+          manualVerificationRequired: true,
+          confidence: 'high_heuristic',
           targetPath: target.path,
         })
       );
@@ -680,6 +873,8 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
     // =========================================================================
     let isMultiTenantApp = false;
     let missingTenantFilterFinding = null;
+    let hasCentralizedTenantScoping = false;
+    let hasInlineTenantFilter = false;
 
     // Check for multi-tenant schema models
     for (const relFile of files) {
@@ -706,6 +901,12 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
           const full = path.join(projectDir, relFile);
           try {
             const content = fs.readFileSync(full, 'utf8');
+            if (
+              content.includes('$extends') &&
+              (content.includes('tenantId') || content.includes('tenant_id'))
+            ) {
+              hasCentralizedTenantScoping = true;
+            }
             const lines = content.split(/\r?\n/);
             for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
               const line = lines[lineIdx];
@@ -716,7 +917,6 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
                 /\.project\.update\s*\(/.test(line) ||
                 /\.project\.delete\s*\(/.test(line)
               ) {
-                // Read next few lines to check where block
                 const contextBlock = lines.slice(lineIdx, Math.min(lines.length, lineIdx + 10)).join('\n');
                 if (contextBlock.includes('where') && !contextBlock.includes('tenantId') && !contextBlock.includes('organizationId')) {
                   missingTenantFilterFinding = {
@@ -725,6 +925,8 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
                     snippet: line.trim(),
                   };
                   break;
+                } else if (contextBlock.includes('tenantId') || contextBlock.includes('organizationId')) {
+                  hasInlineTenantFilter = true;
                 }
               }
             }
@@ -754,20 +956,54 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
             targetPath: target.path,
           })
         );
-      } else {
+      } else if (hasCentralizedTenantScoping) {
         findings.push(
           this.createFinding({
             id: 'SEC-006',
             category: 'security',
             status: 'PASS',
             severity: 'info',
-            title: 'Multi-Tenant Data Isolation Filters Enforced',
-            explanation: 'Multi-tenant database queries enforce tenant isolation filters in data access layers.',
+            title: 'Centralized Multi-Tenant Query Scoping Configured',
+            explanation: 'Detected centralized tenant scoping extension/middleware enforcing tenant boundary filters across entity queries.',
             evidence: { file: 'src/' },
             checkMethod: 'static_analysis',
-            recommendation: 'Conduct tenant boundary authorization integration tests to verify row-level tenant containment.',
+            recommendation: 'Conduct automated cross-tenant authorization integration tests to verify row-level tenant containment.',
             manualVerificationRequired: false,
-            confidence: 'verified_fact',
+            confidence: 'high_heuristic',
+            targetPath: target.path,
+          })
+        );
+      } else if (hasInlineTenantFilter) {
+        findings.push(
+          this.createFinding({
+            id: 'SEC-006',
+            category: 'security',
+            status: 'MANUAL_REVIEW',
+            severity: 'medium',
+            title: 'Multi-Tenant Data Isolation Requires Runtime Boundary Verification',
+            explanation: 'Static query filters (tenantId) detected on multi-tenant entity, but runtime cross-tenant data isolation cannot be verified by static analysis alone. Automated tenant isolation testing or database Row-Level Security (RLS) recommended.',
+            evidence: { file: 'src/' },
+            checkMethod: 'manual_verification_required',
+            recommendation: 'Implement automated cross-tenant integration tests (Tenant A attempting to read/update/delete Tenant B data) or database RLS.',
+            manualVerificationRequired: true,
+            confidence: 'high_heuristic',
+            targetPath: target.path,
+          })
+        );
+      } else {
+        findings.push(
+          this.createFinding({
+            id: 'SEC-006',
+            category: 'security',
+            status: 'MANUAL_REVIEW',
+            severity: 'medium',
+            title: 'Multi-Tenant Entity Isolation Unverified',
+            explanation: 'Multi-tenant schema identifiers detected, but no explicit query filtering or centralized tenant scoping was found.',
+            evidence: { file: 'prisma/schema.prisma' },
+            checkMethod: 'manual_verification_required',
+            recommendation: 'Audit all entity queries to enforce tenant scoping or apply database row-level security.',
+            manualVerificationRequired: true,
+            confidence: 'unverified',
             targetPath: target.path,
           })
         );
@@ -813,6 +1049,9 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
       );
     } else {
       let unprotectedAdminRoute = null;
+      let hasAuthMiddleware = false;
+      let hasMutatingRoutes = false;
+
       for (const relFile of files) {
         if (
           (relFile.endsWith('.ts') || relFile.endsWith('.js') || relFile.endsWith('.mjs')) &&
@@ -823,6 +1062,19 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
           const full = path.join(projectDir, relFile);
           try {
             const content = fs.readFileSync(full, 'utf8');
+            if (
+              content.includes('requireAuth') ||
+              content.includes('authenticate(') ||
+              content.includes('passport.authenticate') ||
+              content.includes('jwt.verify') ||
+              content.includes('AuthGuard')
+            ) {
+              hasAuthMiddleware = true;
+            }
+            if (/(?:app|router)\.(?:post|put|patch|delete)\s*\(/.test(content)) {
+              hasMutatingRoutes = true;
+            }
+
             const lines = content.split(/\r?\n/);
             for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
               const line = lines[lineIdx];
@@ -861,6 +1113,40 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
             recommendation: 'Attach authentication (e.g. requireAuth) and role-based access control (RBAC) middleware to administrative endpoints.',
             manualVerificationRequired: false,
             confidence: 'verified_fact',
+            targetPath: target.path,
+          })
+        );
+      } else if (hasAuthMiddleware) {
+        findings.push(
+          this.createFinding({
+            id: 'SEC-007',
+            category: 'security',
+            status: 'PASS',
+            severity: 'info',
+            title: 'Route Authorization Middleware Guardrails Enforced',
+            explanation: 'Detected authentication and authorization middleware attached to application routes. Note: Static analysis verifies middleware presence; comprehensive endpoint coverage requires integration tests.',
+            evidence: { file: 'src/' },
+            checkMethod: 'static_analysis',
+            recommendation: 'Ensure all mutating and privileged routes require authentication and proper role permissions.',
+            manualVerificationRequired: false,
+            confidence: 'high_heuristic',
+            targetPath: target.path,
+          })
+        );
+      } else if (hasMutatingRoutes) {
+        findings.push(
+          this.createFinding({
+            id: 'SEC-007',
+            category: 'security',
+            status: 'MANUAL_REVIEW',
+            severity: 'medium',
+            title: 'Route Authorization Architecture Requires Human Audit',
+            explanation: 'Application declares mutating HTTP endpoints, but centralized or route-level authentication middleware could not be verified statically.',
+            evidence: { file: 'src/' },
+            checkMethod: 'manual_verification_required',
+            recommendation: 'Audit all mutating endpoints to confirm authentication and authorization checks are properly attached.',
+            manualVerificationRequired: true,
+            confidence: 'medium_heuristic',
             targetPath: target.path,
           })
         );
@@ -1432,29 +1718,9 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
         const hasDownMigrations = sqlMigrations.some(
           (f) => f.includes('.down.') || f.includes('_down.') || (f.startsWith('U') && f.endsWith('.sql'))
         );
-        const hasRollback =
-          sqlMigrations.length > 0
-            ? hasDownMigrations
-            : files.some((f) => f.includes('schema.prisma'));
+        const hasPrisma = files.some((f) => f.includes('schema.prisma'));
 
-        if (hasRollback) {
-          findings.push(
-            this.createFinding({
-              id: 'DB-002',
-              category: 'database',
-              status: 'PASS',
-              severity: 'info',
-              title: 'Database Migration Scripts with Rollback Support Present',
-              explanation: `Found database migration files with rollback readiness: ${migrationFiles.slice(0, 3).join(', ')}.`,
-              evidence: { file: migrationFiles[0] },
-              checkMethod: 'static_analysis',
-              recommendation: 'Verify forward and backward migration compatibility in staging before release.',
-              manualVerificationRequired: false,
-              confidence: 'verified_fact',
-              targetPath: target.path,
-            })
-          );
-        } else {
+        if (sqlMigrations.length > 0 && !hasDownMigrations) {
           findings.push(
             this.createFinding({
               id: 'DB-002',
@@ -1462,12 +1728,46 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
               status: 'WARNING',
               severity: 'medium',
               title: 'Database Migrations Lack Rollback (Down) Scripts',
-              explanation: `Found database migration files (${migrationFiles.slice(0, 2).join(', ')}), but no rollback (*.down.sql) scripts or down functions were detected.`,
+              explanation: `Found database migration files (${migrationFiles.slice(0, 2).join(', ')}), but no rollback (*.down.sql) scripts or down functions were detected. Forward-only or expand-and-contract release planning required.`,
               evidence: { file: migrationFiles[0] },
               checkMethod: 'static_analysis',
               recommendation: 'Author reversible migration scripts (*.down.sql) to ensure safe operational rollback during failed releases.',
               manualVerificationRequired: false,
               confidence: 'verified_fact',
+              targetPath: target.path,
+            })
+          );
+        } else if (hasPrisma) {
+          findings.push(
+            this.createFinding({
+              id: 'DB-002',
+              category: 'database',
+              status: 'PASS',
+              severity: 'info',
+              title: 'Declarative Database Migrations Configured (Prisma)',
+              explanation: `Found Prisma schema and migration tracking files: ${migrationFiles.slice(0, 3).join(', ')}. Note: Prisma uses forward-only migrations; verify schema compatibility in staging.`,
+              evidence: { file: migrationFiles[0] },
+              checkMethod: 'static_analysis',
+              recommendation: 'Verify forward schema migration compatibility and backup procedures in staging before production release.',
+              manualVerificationRequired: false,
+              confidence: 'verified_fact',
+              targetPath: target.path,
+            })
+          );
+        } else if (sqlMigrations.length > 0 && hasDownMigrations) {
+          findings.push(
+            this.createFinding({
+              id: 'DB-002',
+              category: 'database',
+              status: 'PASS',
+              severity: 'info',
+              title: 'Database Migration Scripts with Rollback Support Present',
+              explanation: `Found database migration files with rollback readiness: ${migrationFiles.slice(0, 3).join(', ')}. Note: Static presence of rollback files does not prove rollback idempotency; staging execution verification recommended.`,
+              evidence: { file: migrationFiles[0] },
+              checkMethod: 'static_analysis',
+              recommendation: 'Verify forward and backward migration compatibility in staging before release.',
+              manualVerificationRequired: false,
+              confidence: 'high_heuristic',
               targetPath: target.path,
             })
           );
@@ -1512,6 +1812,9 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
       // DB-004: SQL Injection Defenses & Parameterized Query Enforcement
       // =========================================================================
       let rawSqlInjectionFinding = null;
+      let dynamicSqlVariableFinding = null;
+      let hasTypeSafeOrmMethods = false;
+
       for (const relFile of files) {
         if (
           (relFile.endsWith('.ts') || relFile.endsWith('.js') || relFile.endsWith('.mjs')) &&
@@ -1522,14 +1825,27 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
           const full = path.join(projectDir, relFile);
           try {
             const content = fs.readFileSync(full, 'utf8');
+            if (
+              content.includes('.findMany(') ||
+              content.includes('.findUnique(') ||
+              content.includes('.findFirst(') ||
+              content.includes('.create(') ||
+              content.includes('.update(') ||
+              content.includes('.delete(')
+            ) {
+              hasTypeSafeOrmMethods = true;
+            }
+
             const lines = content.split(/\r?\n/);
             for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
               const line = lines[lineIdx];
+              // Confirmed interpolation or concatenation in raw query APIs
               if (
                 /\$(?:queryRawUnsafe|executeRawUnsafe)\s*\(\s*`[^`]*\$\{/.test(line) ||
                 /\.raw\s*\(\s*`[^`]*\$\{/.test(line) ||
                 /(?:db|client|pool)\.query\s*\(\s*`[^`]*\$\{/.test(line) ||
-                /sequelize\.query\s*\(\s*`[^`]*\$\{/.test(line)
+                /sequelize\.query\s*\(\s*`[^`]*\$\{/.test(line) ||
+                /(?:db|client|pool)\.query\s*\(\s*['"][^'"]*['"]\s*\+/.test(line)
               ) {
                 rawSqlInjectionFinding = {
                   file: relFile,
@@ -1537,6 +1853,18 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
                   snippet: line.trim(),
                 };
                 break;
+              }
+
+              // Dynamic SQL variable passed to raw execution without parameter array
+              if (
+                /\$(?:queryRawUnsafe|executeRawUnsafe)\s*\(\s*[a-zA-Z0-9_]+\s*\)/.test(line) ||
+                /(?:db|client|pool)\.query\s*\(\s*[a-zA-Z0-9_]+\s*\)/.test(line)
+              ) {
+                dynamicSqlVariableFinding = {
+                  file: relFile,
+                  line: lineIdx + 1,
+                  snippet: line.trim(),
+                };
               }
             }
           } catch {}
@@ -1565,7 +1893,28 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
             targetPath: target.path,
           })
         );
-      } else {
+      } else if (dynamicSqlVariableFinding) {
+        findings.push(
+          this.createFinding({
+            id: 'DB-004',
+            category: 'database',
+            status: 'MANUAL_REVIEW',
+            severity: 'medium',
+            title: 'Dynamic SQL Query Variable Requires Parameterization Verification',
+            explanation: `Raw database query accepts dynamic SQL variable in "${dynamicSqlVariableFinding.file}". Verify statically or via tests that the variable is safely parameterized without string concatenation.`,
+            evidence: {
+              file: dynamicSqlVariableFinding.file,
+              line: dynamicSqlVariableFinding.line,
+              snippet: sanitizeOutput(dynamicSqlVariableFinding.snippet),
+            },
+            checkMethod: 'manual_verification_required',
+            recommendation: 'Enforce parameterized query placeholders ($1, ?) rather than constructing dynamic query strings.',
+            manualVerificationRequired: true,
+            confidence: 'high_heuristic',
+            targetPath: target.path,
+          })
+        );
+      } else if (hasTypeSafeOrmMethods) {
         findings.push(
           this.createFinding({
             id: 'DB-004',
@@ -1573,12 +1922,29 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
             status: 'PASS',
             severity: 'info',
             title: 'Parameterized Database Queries Enforced',
-            explanation: 'No raw SQL query string interpolation or unsafe template concatenation detected across application source files.',
+            explanation: 'Type-safe ORM query methods (Prisma / Drizzle) detected across data access layers. Note: Any raw query escapes must maintain parameter placeholders.',
             evidence: { file: 'src/' },
             checkMethod: 'static_analysis',
             recommendation: 'Maintain automated lint rules (e.g. security/detect-sql-injection) to prevent accidental raw query concatenation.',
             manualVerificationRequired: false,
             confidence: 'verified_fact',
+            targetPath: target.path,
+          })
+        );
+      } else {
+        findings.push(
+          this.createFinding({
+            id: 'DB-004',
+            category: 'database',
+            status: 'MANUAL_REVIEW',
+            severity: 'medium',
+            title: 'Manual SQL Parameterization Audit Recommended',
+            explanation: 'Database dependencies declared but no high-level type-safe ORM query builder methods detected. Verify all raw database queries use positional parameters ($1, ?).',
+            evidence: { file: 'package.json' },
+            checkMethod: 'manual_verification_required',
+            recommendation: 'Audit all database query executions to confirm parameterized query placeholders are consistently used.',
+            manualVerificationRequired: true,
+            confidence: 'unverified',
             targetPath: target.path,
           })
         );
@@ -1605,11 +1971,30 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
             let relMatch;
             while ((relMatch = relRegex.exec(modelBody)) !== null) {
               const fkField = relMatch[1];
-              const indexRegex = new RegExp(`@@index\\s*\\(\\s*\\[[^\\]]*\\b${fkField}\\b[^\\]]*\\]\\)`);
-              const uniqueRegex = new RegExp(`@@unique\\s*\\(\\s*\\[[^\\]]*\\b${fkField}\\b[^\\]]*\\]\\)`);
+
+              // Check single-column index or unique
+              const singleIndexRegex = new RegExp(`@@index\\s*\\(\\s*\\[\\s*${fkField}\\s*\\]\\)`);
+              const singleUniqueRegex = new RegExp(`@@unique\\s*\\(\\s*\\[\\s*${fkField}\\s*\\]\\)`);
               const fieldLineRegex = new RegExp(`^\\s*${fkField}\\s+[^\\n]*@(unique|id)`, 'm');
 
-              if (!indexRegex.test(modelBody) && !uniqueRegex.test(modelBody) && !fieldLineRegex.test(modelBody)) {
+              let isCoveredByLeftmostPrefix = false;
+              // Check multi-column composite index with leftmost prefix
+              const compositeIndexRegex = /@@(?:index|unique)\s*\(\s*\[([a-zA-Z0-9_,\s]+)\]\)/g;
+              let compMatch;
+              while ((compMatch = compositeIndexRegex.exec(modelBody)) !== null) {
+                const cols = compMatch[1].split(',').map((c) => c.trim());
+                if (cols[0] === fkField) {
+                  isCoveredByLeftmostPrefix = true;
+                  break;
+                }
+              }
+
+              if (
+                !singleIndexRegex.test(modelBody) &&
+                !singleUniqueRegex.test(modelBody) &&
+                !fieldLineRegex.test(modelBody) &&
+                !isCoveredByLeftmostPrefix
+              ) {
                 unindexedFkFinding = {
                   file: prismaFiles[0],
                   modelName,
@@ -1632,13 +2017,30 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
             status: 'WARNING',
             severity: 'medium',
             title: 'Unindexed Foreign Key Relation in Database Schema',
-            explanation: `Prisma model "${unindexedFkFinding.modelName}" declares foreign key relation "${unindexedFkFinding.fkField}" without a supporting "@@index([${unindexedFkFinding.fkField}])". Unindexed foreign keys cause full table scans during relation joins.`,
+            explanation: `Prisma model "${unindexedFkFinding.modelName}" declares foreign key relation "${unindexedFkFinding.fkField}" without a supporting direct index or leftmost-prefix composite index. Unindexed foreign keys may cause degraded query performance during join operations.`,
             evidence: {
               file: unindexedFkFinding.file,
               snippet: unindexedFkFinding.snippet,
             },
             checkMethod: 'static_analysis',
-            recommendation: `Add "@@index([${unindexedFkFinding.fkField}])" to model ${unindexedFkFinding.modelName} in schema.prisma.`,
+            recommendation: `Add "@@index([${unindexedFkFinding.fkField}])" or composite index with "${unindexedFkFinding.fkField}" as leftmost column in model ${unindexedFkFinding.modelName}.`,
+            manualVerificationRequired: false,
+            confidence: 'verified_fact',
+            targetPath: target.path,
+          })
+        );
+      } else if (prismaFiles.length > 0) {
+        findings.push(
+          this.createFinding({
+            id: 'DB-005',
+            category: 'database',
+            status: 'PASS',
+            severity: 'info',
+            title: 'Database Foreign Key Relations Properly Indexed',
+            explanation: 'All foreign key relation fields in schema.prisma include supporting index declarations or composite leftmost-prefix indexes.',
+            evidence: { file: prismaFiles[0] },
+            checkMethod: 'static_analysis',
+            recommendation: 'Ensure all foreign key columns have indexes to maintain optimal join query performance.',
             manualVerificationRequired: false,
             confidence: 'verified_fact',
             targetPath: target.path,
@@ -1649,17 +2051,15 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
           this.createFinding({
             id: 'DB-005',
             category: 'database',
-            status: 'PASS',
-            severity: 'info',
-            title: 'Database Foreign Key Relations Properly Indexed',
-            explanation: prismaFiles.length > 0
-              ? 'All foreign key relation fields in schema.prisma include supporting index declarations.'
-              : 'Relational schema indexing conventions verified.',
-            evidence: { file: prismaFiles[0] || 'migrations/' },
-            checkMethod: 'static_analysis',
-            recommendation: 'Ensure all foreign key columns have indexes to maintain sub-millisecond join performance.',
-            manualVerificationRequired: false,
-            confidence: 'verified_fact',
+            status: 'MANUAL_REVIEW',
+            severity: 'medium',
+            title: 'Database Indexing Strategy Requires Review',
+            explanation: 'Relational database driver declared without declarative Prisma schema. Verify migration scripts declare indexes on foreign key columns.',
+            evidence: { file: 'package.json' },
+            checkMethod: 'manual_verification_required',
+            recommendation: 'Review SQL migration files to ensure all foreign key columns have supporting indexes.',
+            manualVerificationRequired: true,
+            confidence: 'unverified',
             targetPath: target.path,
           })
         );
