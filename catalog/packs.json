@@ -16,12 +16,10 @@
     "name": "EnvGuard Full-Stack Engineering",
     "description": "Comprehensive full-stack application development skills covering frontend, backend, UI design, database engineering, system design, API contracts, and integration.",
     "skills": [
-      "envguard-frontend",
-      "envguard-ui-design",
+      "envguard-system-design",
       "envguard-backend",
       "envguard-database",
-      "envguard-system-design",
-      "envguard-api-design",
+      "envguard-frontend",
       "envguard-fullstack-integration"
     ]
   },
