@@ -28,14 +28,23 @@ node tools/skill-manager.mjs install --pack core --dest /path/to/my-project --dr
 # Install core pack for OpenAI Codex (.agents/skills/)
 node tools/skill-manager.mjs install --pack core --dest /path/to/my-project --target codex
 
+# Install production readiness pack (includes bundled readiness auditor)
+node tools/skill-manager.mjs install --pack production --dest /path/to/my-project --target codex
+
 # Install core pack for Google Antigravity or Claude Code (skills/)
 node tools/skill-manager.mjs install --pack core --dest /path/to/my-project --target antigravity
 
 # Install a single skill
 node tools/skill-manager.mjs install --skill envguard-audit --dest /path/to/my-project
 
+# Run the bundled readiness auditor in target project
+node /path/to/my-project/.agents/skills/envguard-production-readiness/scripts/readiness-auditor.mjs scan --project /path/to/my-project
+
+# Preview planned commands and effects without execution
+node /path/to/my-project/.agents/skills/envguard-production-readiness/scripts/readiness-auditor.mjs scan --project /path/to/my-project --preview-commands
+
 # Remove installed skills cleanly
-node tools/skill-manager.mjs uninstall --pack core --dest /path/to/my-project
+node tools/skill-manager.mjs uninstall --pack production --dest /path/to/my-project
 ```
 
 All installations write `.envguard-skills.json` tracking metadata to ensure idempotent updates and safe removals.

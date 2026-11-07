@@ -46,13 +46,21 @@ Guides engineers and AI agents in conducting rigorous, evidence-based applicatio
 - **Rule**: Never run arbitrary untrusted scripts, database drop commands, or unapproved network requests.
 
 ### Step 2: Execute Readiness Scan
-- Run the standalone auditor tool against the target project:
+- Locate the readiness auditor script in your workspace:
+  - If installed via skill pack (.agents): `node .agents/skills/envguard-production-readiness/scripts/readiness-auditor.mjs`
+  - If installed via Antigravity/Claude (skills): `node skills/envguard-production-readiness/scripts/readiness-auditor.mjs`
+  - If running in EnvGuard repository checkout: `node tools/readiness-auditor.mjs`
+- Preview planned commands and potential effects without execution:
   ```bash
-  node tools/readiness-auditor.mjs scan --project ./my-app --format both --output-dir ./reports
+  node .agents/skills/envguard-production-readiness/scripts/readiness-auditor.mjs scan --project ./my-app --preview-commands
   ```
-- Or with explicit execution approval:
+- Run standard read-only assessment:
   ```bash
-  node tools/readiness-auditor.mjs scan --project ./my-app --allow-exec --format both --output-dir ./reports
+  node .agents/skills/envguard-production-readiness/scripts/readiness-auditor.mjs scan --project ./my-app --format both --output-dir ./reports
+  ```
+- Run authorized verification in container isolation or with explicit host trust:
+  ```bash
+  node .agents/skills/envguard-production-readiness/scripts/readiness-auditor.mjs scan --project ./my-app --allow-exec --trust-project --format both --output-dir ./reports
   ```
 
 ### Step 3: Nine Modular Assessment Dimensions

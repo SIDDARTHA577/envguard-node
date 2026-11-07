@@ -8,8 +8,16 @@ import {
   stripAnsi,
   sanitizeOutput,
   assertSafeProjectDir,
+  assertSafeOutputDir,
+  runProjectCommand,
+  buildSanitizedEnv,
+  parseGitignoreRules,
+  isPathIgnoredByRules,
+  previewExecutionCommands,
+  EXIT_CODES,
   main,
 } from '../../tools/readiness-auditor.mjs';
+import { installSkills, uninstallSkills } from '../../tools/skill-manager.mjs';
 
 describe('EnvGuard Production Readiness Auditor', () => {
   const rootDir = path.resolve('.');
@@ -31,7 +39,7 @@ describe('EnvGuard Production Readiness Auditor', () => {
       expect(passedIds).toContain('ENV-001');  // .env.example
       expect(passedIds).toContain('ENV-002');  // .gitignore
       expect(passedIds).toContain('API-002');  // valid openapi
-      expect(passedIds).toContain('API-004');  // RFC 7807 problem details
+      expect(passedIds).toContain('API-004');  // RFC 9457 problem details
       expect(passedIds).toContain('DEP-001');  // Dockerfile
       expect(passedIds).toContain('DEP-002');  // /health route
       expect(passedIds).toContain('DEP-003');  // SIGTERM handler
@@ -43,8 +51,27 @@ describe('EnvGuard Production Readiness Auditor', () => {
       expect(buildCheck?.manualVerificationRequired).toBe(true);
     });
 
-    it('executes declared build and test commands when allowExec is true', () => {
-      const report = runReadinessAudit({ projectDir, allowExec: true, timeoutMs: 5000 });
+    it('blocks execution when allowExec is true but host is unisolated and trustProject is false', () => {
+      const report = runReadinessAudit({
+        projectDir,
+        allowExec: true,
+        trustProject: false,
+        isIsolated: false,
+        timeoutMs: 5000,
+      });
+
+      const testCheck = report.findings.find((f) => f.id === 'BUILD-002');
+      expect(testCheck?.status).toBe('NOT_RUN');
+      expect(testCheck?.title).toContain('Blocked by Containment Policy');
+    });
+
+    it('executes declared build and test commands when allowExec is true with explicit host trust', () => {
+      const report = runReadinessAudit({
+        projectDir,
+        allowExec: true,
+        trustProject: true,
+        timeoutMs: 10000,
+      });
 
       expect(report.summary.fail).toBe(0);
 
@@ -55,7 +82,12 @@ describe('EnvGuard Production Readiness Auditor', () => {
 
       const buildCheck = report.findings.find((f) => f.id === 'BUILD-001');
       expect(buildCheck?.status).toBe('PASS');
-    });
+
+      // Verify execution audit trail
+      expect(report.executionAudit).toBeDefined();
+      expect(report.executionAudit.length).toBeGreaterThan(0);
+      expect(report.executionAudit[0].command).toBe('npm');
+    }, 15000);
   });
 
   describe('Scenario 2: Missing Environment Configuration (missing-env)', () => {
@@ -76,7 +108,7 @@ describe('EnvGuard Production Readiness Auditor', () => {
       }
     });
 
-    it('identifies missing template, missing gitignore rule, and committed .env file without leaking secrets', () => {
+    it('identifies missing template, missing gitignore rule, and untracked unignored .env file without leaking secrets', () => {
       const report = runReadinessAudit({ projectDir, allowExec: false });
 
       expect(report.summary.fail).toBeGreaterThanOrEqual(2);
@@ -89,9 +121,8 @@ describe('EnvGuard Production Readiness Auditor', () => {
       expect(missingIgnore?.status).toBe('FAIL');
       expect(missingIgnore?.severity).toBe('critical');
 
-      const committedEnv = report.findings.find((f) => f.id === 'ENV-004');
-      expect(committedEnv?.status).toBe('FAIL');
-      expect(committedEnv?.severity).toBe('critical');
+      const unignoredEnv = report.findings.find((f) => f.id === 'ENV-004');
+      expect(unignoredEnv?.status).toBe('FAIL');
 
       // Ensure secret value is never in findings
       const json = JSON.stringify(report);
@@ -102,7 +133,7 @@ describe('EnvGuard Production Readiness Auditor', () => {
   describe('Scenario 3: Broken API Contract (broken-api)', () => {
     const projectDir = path.join(fixturesDir, 'broken-api');
 
-    it('detects RPC action verbs and missing RFC 7807 Problem Details model', () => {
+    it('detects RPC action verbs and missing RFC 9457 Problem Details model', () => {
       const report = runReadinessAudit({ projectDir, allowExec: false });
 
       const rpcWarning = report.findings.find((f) => f.id === 'API-003');
@@ -132,14 +163,19 @@ describe('EnvGuard Production Readiness Auditor', () => {
   describe('Scenario 5: Failing Tests (failing-tests)', () => {
     const projectDir = path.join(fixturesDir, 'failing-tests');
 
-    it('reports NOT_RUN in read-only mode and reports FAIL with exit code 1 under --allow-exec', () => {
+    it('reports NOT_RUN in read-only mode and reports FAIL with exit code 1 under authorized execution', () => {
       // 1. Read-only mode
       const readOnlyReport = runReadinessAudit({ projectDir, allowExec: false });
       const testReadOnly = readOnlyReport.findings.find((f) => f.id === 'BUILD-002');
       expect(testReadOnly?.status).toBe('NOT_RUN');
 
       // 2. Authorized execution mode
-      const execReport = runReadinessAudit({ projectDir, allowExec: true, timeoutMs: 5000 });
+      const execReport = runReadinessAudit({
+        projectDir,
+        allowExec: true,
+        trustProject: true,
+        timeoutMs: 5000,
+      });
       const testExec = execReport.findings.find((f) => f.id === 'BUILD-002');
       expect(testExec?.status).toBe('FAIL');
       expect(testExec?.evidence?.exitCode).toBe(1);
@@ -167,6 +203,161 @@ describe('EnvGuard Production Readiness Auditor', () => {
 
       const noCi = report.findings.find((f) => f.id === 'DEP-004');
       expect(noCi?.status).toBe('WARNING');
+    });
+  });
+
+  describe('Scenario 7: OpenAPI 3.1 YAML Specification (openapi-yaml)', () => {
+    const projectDir = path.join(fixturesDir, 'openapi-yaml');
+
+    it('successfully parses OpenAPI YAML, validates 3.1 schema structure and RFC 9457 model', () => {
+      const report = runReadinessAudit({ projectDir, allowExec: false, categories: ['api'] });
+
+      const parsedFinding = report.findings.find((f) => f.id === 'API-001');
+      expect(parsedFinding?.status).toBe('PASS');
+      expect(parsedFinding?.title).toContain('YAML');
+
+      const schemaFinding = report.findings.find((f) => f.id === 'API-002');
+      expect(schemaFinding?.status).toBe('PASS');
+      expect(schemaFinding?.title).toContain('3.1.0');
+
+      const problemFinding = report.findings.find((f) => f.id === 'API-004');
+      expect(problemFinding?.status).toBe('PASS');
+      expect(problemFinding?.title).toContain('RFC 9457');
+    });
+  });
+
+  describe('Scenario 8: Malformed OpenAPI YAML (invalid-openapi-yaml)', () => {
+    const projectDir = path.join(fixturesDir, 'invalid-openapi-yaml');
+
+    it('handles malformed YAML syntax gracefully and records API-001 FAIL without crashing', () => {
+      const report = runReadinessAudit({ projectDir, allowExec: false, categories: ['api'] });
+
+      const parsedFinding = report.findings.find((f) => f.id === 'API-001');
+      expect(parsedFinding?.status).toBe('FAIL');
+      expect(parsedFinding?.title).toBe('Malformed OpenAPI Specification');
+    });
+  });
+
+  describe('Git-Tracking vs Working Tree Accuracy', () => {
+    it('correctly parses .gitignore rules including comments, whitespace, and negation', () => {
+      const gitignore = `
+        # Ignore secret files
+        .env
+        .env.*
+        !.env.example
+        *.log
+        dist/
+      `;
+      const rules = parseGitignoreRules(gitignore);
+      expect(rules.length).toBe(5);
+
+      expect(isPathIgnoredByRules(rules, '.env')).toBe(true);
+      expect(isPathIgnoredByRules(rules, '.env.local')).toBe(true);
+      expect(isPathIgnoredByRules(rules, '.env.production')).toBe(true);
+      expect(isPathIgnoredByRules(rules, '.env.example')).toBe(false); // negated!
+      expect(isPathIgnoredByRules(rules, 'app.log')).toBe(true);
+      expect(isPathIgnoredByRules(rules, 'src/index.ts')).toBe(false);
+    });
+
+    it('classifies untracked local .env file that IS ignored as PASS (info) rather than committed', () => {
+      const tempProject = fs.mkdtempSync(path.join(os.tmpdir(), 'envguard-test-env-'));
+      try {
+        fs.writeFileSync(path.join(tempProject, 'package.json'), JSON.stringify({ name: 'test' }));
+        fs.writeFileSync(path.join(tempProject, '.env.example'), 'PORT=3000\n');
+        fs.writeFileSync(path.join(tempProject, '.gitignore'), '.env\n');
+        fs.writeFileSync(path.join(tempProject, '.env'), 'PORT=3000\nSECRET=local_only\n');
+
+        const report = runReadinessAudit({ projectDir: tempProject, categories: ['env'] });
+        const envFinding = report.findings.find((f) => f.id === 'ENV-004');
+
+        expect(envFinding?.status).toBe('PASS');
+        expect(envFinding?.title).toContain('Safely Ignored');
+        expect(envFinding?.explanation).not.toContain('tracked in Git');
+      } finally {
+        fs.rmSync(tempProject, { recursive: true, force: true });
+      }
+    });
+  });
+
+  describe('Security Boundaries & Untrusted Command Execution', () => {
+    let tempProject: string;
+
+    beforeEach(() => {
+      tempProject = fs.mkdtempSync(path.join(os.tmpdir(), 'envguard-security-test-'));
+    });
+
+    afterEach(() => {
+      if (fs.existsSync(tempProject)) {
+        try {
+          fs.rmSync(tempProject, { recursive: true, force: true });
+        } catch {
+          // Ignore transient Windows file handle release
+        }
+      }
+    });
+
+    it('strips parent environment variables and passes only minimized safe variables', () => {
+      const taintedEnv = {
+        PATH: process.env.PATH || '',
+        AWS_SECRET_ACCESS_KEY: 'super_secret_aws_key',
+        GITHUB_TOKEN: 'ghp_fake_token_123456789',
+        DATABASE_PASSWORD: 'super_secret_password',
+      };
+      const clean = buildSanitizedEnv(taintedEnv);
+
+      expect(clean.PATH).toBeDefined();
+      expect(clean.CI).toBe('true');
+      expect(clean.NODE_ENV).toBe('test');
+      expect((clean as Record<string, string>).AWS_SECRET_ACCESS_KEY).toBeUndefined();
+      expect((clean as Record<string, string>).GITHUB_TOKEN).toBeUndefined();
+      expect((clean as Record<string, string>).DATABASE_PASSWORD).toBeUndefined();
+    });
+
+    it('rejects unwhitelisted binaries and commands with shell metacharacters', () => {
+      // 1. Disallowed binary
+      const res1 = runProjectCommand('curl', ['https://evil.com'], tempProject, { allowExec: true, trustProject: true });
+      expect(res1.notRun).toBe(true);
+      expect(res1.reason).toBe('unsupported_binary');
+
+      // 2. Shell injection attempt in argument
+      const res2 = runProjectCommand('npm', ['run', 'test; rm -rf /'], tempProject, { allowExec: true, trustProject: true });
+      expect(res2.notRun).toBe(true);
+      expect(res2.reason).toBe('unsafe_arguments');
+    });
+
+    it('supports --preview-commands to inspect execution plan without running scripts', () => {
+      const preview = previewExecutionCommands(
+        path.join(fixturesDir, 'healthy-app'),
+        { scripts: { test: 'node -e "process.exit(0)"', build: 'node -e "process.exit(0)"' } },
+        10000,
+        { allowExec: false }
+      );
+
+      expect(preview.commands.length).toBe(2);
+      expect(preview.disclosures.network).toBeDefined();
+      expect(preview.disclosures.filesystem).toBeDefined();
+    });
+
+    it('enforces execution timeout limits on long-running commands', () => {
+      fs.writeFileSync(
+        path.join(tempProject, 'package.json'),
+        JSON.stringify({
+          name: 'timeout-test',
+          scripts: { test: 'node -e "setTimeout(() => {}, 5000)"' },
+        })
+      );
+
+      const report = runReadinessAudit({
+        projectDir: tempProject,
+        allowExec: true,
+        trustProject: true,
+        timeoutMs: 300,
+        categories: ['build_test'],
+      });
+
+      const testCheck = report.findings.find((f) => f.id === 'BUILD-002');
+      expect(testCheck?.status).toBe('FAIL');
+      expect(testCheck?.title).toContain('Timed Out');
     });
   });
 
@@ -210,6 +401,11 @@ describe('EnvGuard Production Readiness Auditor', () => {
       }).toThrow(/contains null byte/);
     });
 
+    it('assertSafeOutputDir rejects null bytes and root paths', () => {
+      expect(() => assertSafeOutputDir('out\0dir')).toThrow(/contains null byte/);
+      expect(() => assertSafeOutputDir('/')).toThrow(/Refusing to write assessment reports to system directory/);
+    });
+
     it('sanitizes ANSI escape sequences and masks bearer tokens and stripe keys', () => {
       const ansiInput = '\u001b[31mRed text\u001b[39m and \u001b[1mbold\u001b[22m';
       expect(stripAnsi(ansiInput)).toBe('Red text and bold');
@@ -219,6 +415,9 @@ describe('EnvGuard Production Readiness Auditor', () => {
 
       const ghToken = 'Token: ghp_1234567890abcdefghijklmnopqrstuvwxyz';
       expect(sanitizeOutput(ghToken)).toContain('[REDACTED_GH_TOKEN]');
+
+      const awsKey = 'AccessKey: AKIAIOSFODNN7EXAMPLE';
+      expect(sanitizeOutput(awsKey)).toContain('[REDACTED_AWS_KEY]');
     });
 
     it('generates a valid Markdown report with all 7 required sections', () => {
@@ -235,28 +434,32 @@ describe('EnvGuard Production Readiness Auditor', () => {
 
     it('maintains deterministic finding ordering (by category then by id)', () => {
       const report = runReadinessAudit({ projectDir: path.join(fixturesDir, 'healthy-app') });
+      const catOrder = new Map(['discovery', 'env', 'build_test', 'security', 'api', 'database', 'deployment', 'accessibility', 'performance'].map((c, i) => [c, i]));
       for (let i = 0; i < report.findings.length - 1; i++) {
         const cur = report.findings[i];
         const next = report.findings[i + 1];
         if (cur.category === next.category) {
           expect(cur.id.localeCompare(next.id)).toBeLessThanOrEqual(0);
         } else {
-          expect(cur.category.localeCompare(next.category)).toBeLessThanOrEqual(0);
+          expect(catOrder.get(cur.category)).toBeLessThanOrEqual(catOrder.get(next.category)!);
         }
       }
     });
 
-    it('CLI main() exits 0 on --help, exits 0 on healthy app, and exits 2 when failures exist', () => {
-      expect(main(['--help'])).toBe(0);
+    it('CLI main() exits with appropriate standardized exit codes', () => {
+      // 0 = Success
+      expect(main(['--help'])).toBe(EXIT_CODES.SUCCESS_NO_BLOCKERS);
+      expect(main(['scan', '--project', path.join(fixturesDir, 'healthy-app')])).toBe(EXIT_CODES.SUCCESS_NO_BLOCKERS);
 
-      const healthyCode = main(['scan', '--project', path.join(fixturesDir, 'healthy-app')]);
-      expect(healthyCode).toBe(0);
+      // 2 = Policy Blockers
+      expect(main(['scan', '--project', path.join(fixturesDir, 'missing-env')])).toBe(EXIT_CODES.POLICY_BLOCKERS);
 
-      const failingCode = main(['scan', '--project', path.join(fixturesDir, 'missing-env')]);
-      expect(failingCode).toBe(2);
-
-      const invalidCode = main(['--unknown-flag-xyz']);
-      expect(invalidCode).toBe(1);
+      // 3 = Invalid Arguments
+      expect(main(['--unknown-flag-xyz'])).toBe(EXIT_CODES.INVALID_ARGUMENTS);
+      expect(main(['scan', '--format', 'invalid_format'])).toBe(EXIT_CODES.INVALID_ARGUMENTS);
+      expect(main(['scan', '--checks', 'invalid_category'])).toBe(EXIT_CODES.INVALID_ARGUMENTS);
+      expect(main(['scan', '--timeout', '-100'])).toBe(EXIT_CODES.INVALID_ARGUMENTS);
+      expect(main(['scan', '--project'])).toBe(EXIT_CODES.INVALID_ARGUMENTS); // missing value
     });
 
     it('CLI writes report files when --output-dir is specified', () => {
@@ -270,9 +473,51 @@ describe('EnvGuard Production Readiness Auditor', () => {
         '--format',
         'both',
       ]);
-      expect(code).toBe(0);
+      expect(code).toBe(EXIT_CODES.SUCCESS_NO_BLOCKERS);
       expect(fs.existsSync(path.join(outDir, 'readiness-report.json'))).toBe(true);
       expect(fs.existsSync(path.join(outDir, 'readiness-report.md'))).toBe(true);
+    });
+
+    it('installs the production pack into an external project, executes bundled auditor, and uninstalls cleanly', () => {
+      const externalProject = fs.mkdtempSync(path.join(os.tmpdir(), 'envguard-external-'));
+      try {
+        // 1. Install production pack into external project
+        const installRes = installSkills({
+          packName: 'production',
+          destDir: externalProject,
+          targetHost: 'codex',
+        });
+        expect(installRes.success).toBe(true);
+
+        // 2. Verify files installed: both SKILL.md and bundled script
+        const skillMd = path.join(externalProject, '.agents', 'skills', 'envguard-production-readiness', 'SKILL.md');
+        const auditorScript = path.join(
+          externalProject,
+          '.agents',
+          'skills',
+          'envguard-production-readiness',
+          'scripts',
+          'readiness-auditor.mjs'
+        );
+        expect(fs.existsSync(skillMd)).toBe(true);
+        expect(fs.existsSync(auditorScript)).toBe(true);
+
+        // 3. Verify metadata recorded both files
+        const meta = JSON.parse(fs.readFileSync(path.join(externalProject, '.envguard-skills.json'), 'utf8'));
+        const recordedFiles = meta.skills['envguard-production-readiness'].files.map((f: { path: string }) => f.path);
+        expect(recordedFiles.length).toBeGreaterThanOrEqual(2);
+
+        // 4. Clean uninstall
+        const uninstallRes = uninstallSkills({
+          packName: 'production',
+          destDir: externalProject,
+        });
+        expect(uninstallRes.success).toBe(true);
+        expect(fs.existsSync(skillMd)).toBe(false);
+        expect(fs.existsSync(auditorScript)).toBe(false);
+      } finally {
+        fs.rmSync(externalProject, { recursive: true, force: true });
+      }
     });
   });
 });

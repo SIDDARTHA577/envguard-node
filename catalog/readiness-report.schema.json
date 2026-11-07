@@ -34,10 +34,50 @@
       "required": ["allowExec", "timeoutMs", "categories"],
       "properties": {
         "allowExec": { "type": "boolean" },
+        "trustProject": { "type": "boolean" },
         "timeoutMs": { "type": "integer", "minimum": 100 },
         "categories": {
           "type": "array",
           "items": { "type": "string" }
+        },
+        "allowedCommands": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "executionPolicy": {
+      "type": "object",
+      "properties": {
+        "allowExec": { "type": "boolean" },
+        "trustProject": { "type": "boolean" },
+        "isolated": { "type": "boolean" },
+        "disclosures": {
+          "type": "object",
+          "properties": {
+            "network": { "type": "string" },
+            "filesystem": { "type": "string" }
+          }
+        }
+      }
+    },
+    "executionAudit": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "command": { "type": "string" },
+          "args": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "cwd": { "type": "string" },
+          "timestamp": { "type": "string" },
+          "durationMs": { "type": "integer" },
+          "exitCode": { "type": "integer" },
+          "timedOut": { "type": "boolean" },
+          "isolated": { "type": "boolean" },
+          "trustMode": { "type": "string" }
         }
       }
     },
@@ -84,6 +124,9 @@
         ],
         "properties": {
           "id": { "type": "string" },
+          "checkId": { "type": "string" },
+          "toolName": { "type": "string" },
+          "toolVersion": { "type": "string" },
           "category": { "type": "string" },
           "status": {
             "type": "string",
