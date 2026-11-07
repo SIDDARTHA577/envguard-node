@@ -84,6 +84,18 @@
     "projectMetadata": {
       "type": "object"
     },
+    "policyEvaluation": {
+      "type": "object",
+      "properties": {
+        "outcome": { "type": "string" },
+        "reasons": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "gates": { "type": "object" },
+        "blockerCount": { "type": "integer" }
+      }
+    },
     "summary": {
       "type": "object",
       "required": [
@@ -127,6 +139,8 @@
           "checkId": { "type": "string" },
           "toolName": { "type": "string" },
           "toolVersion": { "type": "string" },
+          "adapterId": { "type": "string" },
+          "targetPath": { "type": "string" },
           "category": { "type": "string" },
           "status": {
             "type": "string",
