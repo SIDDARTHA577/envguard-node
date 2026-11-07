@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import YAML from 'yaml';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -12,7 +13,9 @@ const CATALOG_DIR = path.join(REPO_ROOT, 'catalog');
 const PACKS_PATH = path.join(CATALOG_DIR, 'packs.json');
 const SKILLS_PATH = path.join(CATALOG_DIR, 'skills.json');
 
-const REQUIRED_SECTIONS = [
+export const SUPPORTED_HOSTS = ['codex', 'antigravity', 'claude', 'claude-code', 'cursor'];
+
+export const REQUIRED_SECTIONS = [
   'When to Trigger',
   'When NOT to Trigger',
   'Supported Projects & Environments',
@@ -29,17 +32,19 @@ const REQUIRED_SECTIONS = [
 /**
  * Loads packs registry.
  */
-export function loadPacks() {
-  if (!fs.existsSync(PACKS_PATH)) return [];
-  return JSON.parse(fs.readFileSync(PACKS_PATH, 'utf8'));
+export function loadPacks(repoRoot = REPO_ROOT) {
+  const packsPath = path.join(repoRoot, 'catalog', 'packs.json');
+  if (!fs.existsSync(packsPath)) return [];
+  return JSON.parse(fs.readFileSync(packsPath, 'utf8'));
 }
 
 /**
  * Loads skills registry.
  */
-export function loadSkills() {
-  if (!fs.existsSync(SKILLS_PATH)) return [];
-  return JSON.parse(fs.readFileSync(SKILLS_PATH, 'utf8'));
+export function loadSkills(repoRoot = REPO_ROOT) {
+  const skillsPath = path.join(repoRoot, 'catalog', 'skills.json');
+  if (!fs.existsSync(skillsPath)) return [];
+  return JSON.parse(fs.readFileSync(skillsPath, 'utf8'));
 }
 
 /**
@@ -50,78 +55,263 @@ export function sha256(content) {
 }
 
 /**
- * Parses basic YAML frontmatter from Markdown.
+ * Parses YAML frontmatter using standards-compliant YAML parser.
+ * Supports folded multiline strings, colons inside quotes, arrays, etc.
  */
 export function parseFrontmatter(content) {
-  if (!content.startsWith('---')) return null;
-  const endIdx = content.indexOf('---', 3);
-  if (endIdx === -1) return null;
-  const raw = content.slice(3, endIdx).trim();
-  const fields = {};
-  for (const line of raw.split('\n')) {
-    const colon = line.indexOf(':');
-    if (colon > 0) {
-      const k = line.slice(0, colon).trim();
-      const v = line.slice(colon + 1).trim();
-      fields[k] = v;
-    }
+  if (typeof content !== 'string' || !content.startsWith('---')) {
+    return null;
   }
+  const endIdx = content.indexOf('\n---', 3);
+  if (endIdx === -1) {
+    return null;
+  }
+  const rawYaml = content.slice(3, endIdx).trim();
+  let parsed;
+  try {
+    parsed = YAML.parse(rawYaml);
+  } catch (err) {
+    throw new Error(`YAML frontmatter syntax error: ${err.message}`);
+  }
+
+  if (!parsed || typeof parsed !== 'object') {
+    return null;
+  }
+
   return {
-    frontmatter: fields,
-    body: content.slice(endIdx + 3).trim(),
+    frontmatter: parsed,
+    body: content.slice(endIdx + 4).trim(),
   };
 }
 
 /**
- * Synchronizes canonical skills to .agents/skills/ and updates host manifests.
+ * Validates installation metadata structure and prevents untrusted corruption.
  */
-export function syncSkills(repoRoot = REPO_ROOT) {
-  const skills = loadSkills();
-  const agentsSkillsDir = path.join(repoRoot, '.agents', 'skills');
-
-  if (!fs.existsSync(agentsSkillsDir)) {
-    fs.mkdirSync(agentsSkillsDir, { recursive: true });
+export function validateMetadata(metadata, destDir) {
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
+    throw new Error('Invalid metadata: root must be a valid JSON object.');
+  }
+  if (metadata.managedBy !== 'envguard') {
+    throw new Error(`Invalid metadata: managedBy must be "envguard", got "${metadata.managedBy}".`);
+  }
+  if (typeof metadata.version !== 'string' || !metadata.version) {
+    throw new Error('Invalid metadata: version is required.');
+  }
+  if (!metadata.skills || typeof metadata.skills !== 'object') {
+    throw new Error('Invalid metadata: skills map is required.');
   }
 
+  const seenPaths = new Set();
+
+  for (const [skillName, record] of Object.entries(metadata.skills)) {
+    if (!/^envguard-[a-z0-9-]+$/.test(skillName)) {
+      throw new Error(`Invalid metadata: invalid skill identifier "${skillName}".`);
+    }
+    if (!record || typeof record !== 'object') {
+      throw new Error(`Invalid metadata for skill "${skillName}": entry must be an object.`);
+    }
+    if (!Array.isArray(record.files)) {
+      throw new Error(`Invalid metadata for skill "${skillName}": files array is required.`);
+    }
+    for (const file of record.files) {
+      if (!file || typeof file.path !== 'string' || typeof file.sha256 !== 'string') {
+        throw new Error(`Invalid metadata for skill "${skillName}": malformed file record.`);
+      }
+      if (!/^[a-f0-9]{64}$/.test(file.sha256)) {
+        throw new Error(`Invalid metadata for skill "${skillName}": invalid sha256 hash "${file.sha256}".`);
+      }
+      // Path traversal check on recorded path
+      try {
+        assertSafeDestination(destDir, file.path);
+      } catch (err) {
+        throw new Error(`Invalid metadata for skill "${skillName}": ${err.message}`);
+      }
+
+      if (seenPaths.has(file.path)) {
+        throw new Error(`Invalid metadata: duplicate path "${file.path}" claimed by multiple skills.`);
+      }
+      seenPaths.add(file.path);
+    }
+  }
+
+  return true;
+}
+
+/**
+ * Writes metadata atomically to prevent corrupted files on interruption.
+ */
+export function writeMetadataAtomic(metadataPath, metadata) {
+  const dir = path.dirname(metadataPath);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  const tmpPath = `${metadataPath}.tmp.${process.pid}.${Date.now()}`;
+  const serialized = JSON.stringify(metadata, null, 2);
+  fs.writeFileSync(tmpPath, serialized, 'utf8');
+  fs.renameSync(tmpPath, metadataPath);
+}
+
+/**
+ * Validates destination directory against path traversal attacks and symlink escapes.
+ * Checks lexical containment and inspects existing path components for symlink redirection.
+ */
+export function assertSafeDestination(destDir, subPath = '') {
+  if (subPath.includes('\0')) {
+    throw new Error('Invalid destination path: contains null byte');
+  }
+
+  const resolvedBase = path.resolve(destDir);
+  const resolvedTarget = path.resolve(resolvedBase, subPath);
+
+  // 1. Lexical boundary containment
+  const relative = path.relative(resolvedBase, resolvedTarget);
+  if (relative.startsWith('..') || path.isAbsolute(relative)) {
+    throw new Error(`Path traversal attempt detected: "${subPath}" escapes destination "${destDir}"`);
+  }
+
+  // 2. Symlink escape detection on existing intermediate segments
+  let baseReal;
+  try {
+    baseReal = fs.existsSync(resolvedBase) ? fs.realpathSync.native(resolvedBase) : resolvedBase;
+  } catch {
+    baseReal = resolvedBase;
+  }
+
+  const segments = relative ? relative.split(/[\\/]/) : [];
+  let current = resolvedBase;
+
+  for (const seg of segments) {
+    current = path.join(current, seg);
+    if (fs.existsSync(current)) {
+      try {
+        const stat = fs.lstatSync(current);
+        if (stat.isSymbolicLink()) {
+          const linkReal = fs.realpathSync.native(current);
+          const linkRel = path.relative(baseReal, linkReal);
+          if (linkRel.startsWith('..') || path.isAbsolute(linkRel)) {
+            throw new Error(
+              `Symlink escape detected: "${current}" resolves to "${linkReal}" outside destination directory.`
+            );
+          }
+        }
+      } catch (err) {
+        if (err.message && err.message.includes('Symlink escape detected')) {
+          throw err;
+        }
+        // Inaccessible components handled safely
+      }
+    }
+  }
+
+  return resolvedTarget;
+}
+
+/**
+ * Resolves destination relative directory for target host.
+ */
+export function resolveTargetDirForHost(skillName, targetHost) {
+  if (!SUPPORTED_HOSTS.includes(targetHost)) {
+    throw new Error(
+      `Unsupported target host "${targetHost}". Supported hosts: ${SUPPORTED_HOSTS.join(', ')}`
+    );
+  }
+  switch (targetHost) {
+    case 'antigravity':
+    case 'claude':
+    case 'claude-code':
+      return path.join('skills', skillName);
+    case 'cursor':
+      return path.join('.cursor', 'skills', skillName);
+    case 'codex':
+    default:
+      return path.join('.agents', 'skills', skillName);
+  }
+}
+
+/**
+ * Synchronizes canonical skills to .agents/skills/ and updates host manifests.
+ * Also supports checking synchronization (--check) without modifying disk.
+ */
+export function syncSkills({ repoRoot = REPO_ROOT, checkOnly = false } = {}) {
+  const skills = loadSkills(repoRoot);
+  const agentsSkillsDir = path.join(repoRoot, '.agents', 'skills');
+
+  const issues = [];
   let syncedCount = 0;
 
   for (const skill of skills) {
     const srcDir = path.join(repoRoot, skill.canonicalDir);
     const srcSkill = path.join(srcDir, 'SKILL.md');
-    if (!fs.existsSync(srcSkill)) continue;
+    if (!fs.existsSync(srcSkill)) {
+      issues.push(`Canonical skill missing: ${srcSkill}`);
+      continue;
+    }
 
     const destDir = path.join(agentsSkillsDir, skill.name);
+    const destSkill = path.join(destDir, 'SKILL.md');
+
+    const canonicalContent = fs.readFileSync(srcSkill, 'utf8');
+
+    if (checkOnly) {
+      if (!fs.existsSync(destSkill)) {
+        issues.push(`Missing synchronized skill in .agents/skills/${skill.name}/SKILL.md`);
+      } else {
+        const destContent = fs.readFileSync(destSkill, 'utf8');
+        if (destContent !== canonicalContent) {
+          issues.push(`Synchronized content mismatch in .agents/skills/${skill.name}/SKILL.md`);
+        }
+      }
+      continue;
+    }
+
     if (!fs.existsSync(destDir)) {
       fs.mkdirSync(destDir, { recursive: true });
     }
 
-    const content = fs.readFileSync(srcSkill, 'utf8');
-    const destSkill = path.join(destDir, 'SKILL.md');
-    fs.writeFileSync(destSkill, content, 'utf8');
+    fs.writeFileSync(destSkill, canonicalContent, 'utf8');
     syncedCount++;
 
-    // Copy any scripts or references if present
-    for (const sub of ['scripts', 'references']) {
+    // Copy any scripts, references, or assets if present
+    for (const sub of ['scripts', 'references', 'assets']) {
       const subSrc = path.join(srcDir, sub);
-      if (fs.existsSync(subSrc)) {
+      if (fs.existsSync(subSrc) && fs.statSync(subSrc).isDirectory()) {
         const subDest = path.join(destDir, sub);
         if (!fs.existsSync(subDest)) fs.mkdirSync(subDest, { recursive: true });
         for (const file of fs.readdirSync(subSrc)) {
-          fs.copyFileSync(path.join(subSrc, file), path.join(subDest, file));
+          const itemSrc = path.join(subSrc, file);
+          const itemDest = path.join(subDest, file);
+          if (fs.statSync(itemSrc).isFile()) {
+            fs.copyFileSync(itemSrc, itemDest);
+          }
         }
       }
     }
   }
 
-  return { syncedCount };
+  // Detect stale files in .agents/skills/ that are not in catalog
+  if (fs.existsSync(agentsSkillsDir)) {
+    const validNames = new Set(skills.map((s) => s.name));
+    for (const folder of fs.readdirSync(agentsSkillsDir)) {
+      const folderPath = path.join(agentsSkillsDir, folder);
+      if (fs.statSync(folderPath).isDirectory() && !validNames.has(folder)) {
+        issues.push(`Stale skill folder detected in .agents/skills/${folder}`);
+      }
+    }
+  }
+
+  return {
+    valid: issues.length === 0,
+    syncedCount,
+    issues,
+  };
 }
 
 /**
  * Verifies quality, frontmatter, and completeness across all skills.
  */
 export function verifySkills(repoRoot = REPO_ROOT) {
-  const skills = loadSkills();
-  const packs = loadPacks();
+  const skills = loadSkills(repoRoot);
+  const packs = loadPacks(repoRoot);
   const errors = [];
   const warnings = [];
 
@@ -147,12 +337,18 @@ export function verifySkills(repoRoot = REPO_ROOT) {
       continue;
     }
 
-    // 4. Validate SKILL.md contents
+    // 4. Validate SKILL.md contents using standards-compliant parser
     const rawContent = fs.readFileSync(canonicalPath, 'utf8');
-    const parsed = parseFrontmatter(rawContent);
+    let parsed;
+    try {
+      parsed = parseFrontmatter(rawContent);
+    } catch (err) {
+      errors.push(`Skill ${skill.name} malformed YAML frontmatter: ${err.message}`);
+      continue;
+    }
 
     if (!parsed) {
-      errors.push(`Skill ${skill.name} has missing or malformed YAML frontmatter.`);
+      errors.push(`Skill ${skill.name} has missing YAML frontmatter.`);
       continue;
     }
 
@@ -162,8 +358,16 @@ export function verifySkills(repoRoot = REPO_ROOT) {
       );
     }
 
-    if (!parsed.frontmatter.description) {
-      errors.push(`Skill ${skill.name} frontmatter is missing 'description' field.`);
+    if (!parsed.frontmatter.description || typeof parsed.frontmatter.description !== 'string') {
+      errors.push(`Skill ${skill.name} frontmatter is missing a valid 'description' string.`);
+    } else {
+      const descLen = parsed.frontmatter.description.trim().length;
+      if (descLen < 20) {
+        errors.push(`Skill ${skill.name} description is too short (${descLen} chars, minimum 20).`);
+      }
+      if (descLen > 500) {
+        errors.push(`Skill ${skill.name} description is too long (${descLen} chars, maximum 500).`);
+      }
     }
 
     // 5. Validate required sections
@@ -199,21 +403,7 @@ export function verifySkills(repoRoot = REPO_ROOT) {
 }
 
 /**
- * Validates destination directory against path traversal attacks.
- */
-export function assertSafeDestination(destDir, subPath = '') {
-  const resolvedBase = path.resolve(destDir);
-  const resolvedTarget = path.resolve(resolvedBase, subPath);
-  const relative = path.relative(resolvedBase, resolvedTarget);
-
-  if (relative.startsWith('..') || path.isAbsolute(relative)) {
-    throw new Error(`Path traversal attempt detected: "${subPath}" escapes destination "${destDir}"`);
-  }
-  return resolvedTarget;
-}
-
-/**
- * Installs skills into target destination with safety and idempotency.
+ * Installs skills into target destination with safety, idempotency, and rollback.
  */
 export function installSkills({
   skillName,
@@ -224,8 +414,14 @@ export function installSkills({
   force = false,
   repoRoot = REPO_ROOT,
 } = {}) {
-  const allSkills = loadSkills();
-  const allPacks = loadPacks();
+  if (!SUPPORTED_HOSTS.includes(targetHost)) {
+    throw new Error(
+      `Unsupported target host "${targetHost}". Supported hosts: ${SUPPORTED_HOSTS.join(', ')}`
+    );
+  }
+
+  const allSkills = loadSkills(repoRoot);
+  const allPacks = loadPacks(repoRoot);
 
   let targetSkills = [];
 
@@ -260,9 +456,11 @@ export function installSkills({
 
   if (fs.existsSync(metadataPath)) {
     try {
-      metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf8'));
-    } catch {
-      // Malformed metadata
+      const raw = JSON.parse(fs.readFileSync(metadataPath, 'utf8'));
+      validateMetadata(raw, safeDestRoot);
+      metadata = raw;
+    } catch (err) {
+      throw new Error(`Installation blocked: corrupted installation metadata in destination: ${err.message}`);
     }
   }
 
@@ -284,15 +482,7 @@ export function installSkills({
     const content = fs.readFileSync(srcSkill, 'utf8');
     const hash = sha256(content);
 
-    // Determine target relative destination according to targetHost
-    let targetRelDir;
-    if (targetHost === 'antigravity' || targetHost === 'claude') {
-      targetRelDir = path.join('skills', skill.name);
-    } else {
-      // Default to Agent Skills / Codex standard
-      targetRelDir = path.join('.agents', 'skills', skill.name);
-    }
-
+    const targetRelDir = resolveTargetDirForHost(skill.name, targetHost);
     const targetDestDir = assertSafeDestination(safeDestRoot, targetRelDir);
     const targetFilePath = assertSafeDestination(targetDestDir, 'SKILL.md');
     const relativeToDest = path.relative(safeDestRoot, targetFilePath).replace(/\\/g, '/');
@@ -310,14 +500,22 @@ export function installSkills({
         continue;
       }
 
-      // If file exists and differs, check if managed
-      const isManaged = metadata.skills[skill.name]?.files?.some(
-        (f) => f.path === relativeToDest
-      );
+      // If file exists and differs, verify ownership and modification status
+      const skillRecord = metadata.skills[skill.name];
+      const isManaged = skillRecord?.files?.some((f) => f.path === relativeToDest);
 
       if (!isManaged && !force) {
         plan.errors.push(
           `Conflict: "${relativeToDest}" already exists and is not managed by EnvGuard. Use --force to overwrite.`
+        );
+        continue;
+      }
+
+      // If it IS managed but the user has modified it, protect it unless forced
+      const managedFileRecord = skillRecord?.files?.find((f) => f.path === relativeToDest);
+      if (managedFileRecord && managedFileRecord.sha256 !== existingHash && !force) {
+        plan.errors.push(
+          `Conflict: "${relativeToDest}" has been modified by the developer since installation. Use --force to overwrite.`
         );
         continue;
       }
@@ -339,36 +537,54 @@ export function installSkills({
   }
 
   if (!dryRun) {
-    if (!fs.existsSync(safeDestRoot)) {
-      fs.mkdirSync(safeDestRoot, { recursive: true });
-    }
-
-    for (const item of plan.actions) {
-      const dir = path.dirname(item.dest);
-      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-      fs.writeFileSync(item.dest, item.content, 'utf8');
-
-      if (!metadata.skills[item.skill]) {
-        metadata.skills[item.skill] = {
-          installedAt: new Date().toISOString(),
-          targetHost,
-          files: [],
-        };
+    const createdFiles = [];
+    try {
+      if (!fs.existsSync(safeDestRoot)) {
+        fs.mkdirSync(safeDestRoot, { recursive: true });
       }
 
-      metadata.skills[item.skill].files = [
-        { path: item.relPath, sha256: item.hash },
-      ];
-    }
+      for (const item of plan.actions) {
+        const dir = path.dirname(item.dest);
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 
-    fs.writeFileSync(metadataPath, JSON.stringify(metadata, null, 2), 'utf8');
+        const existed = fs.existsSync(item.dest);
+        fs.writeFileSync(item.dest, item.content, 'utf8');
+
+        if (!existed) {
+          createdFiles.push(item.dest);
+        }
+
+        if (!metadata.skills[item.skill]) {
+          metadata.skills[item.skill] = {
+            installedAt: new Date().toISOString(),
+            targetHost,
+            files: [],
+          };
+        }
+
+        metadata.skills[item.skill].files = [
+          { path: item.relPath, sha256: item.hash },
+        ];
+      }
+
+      writeMetadataAtomic(metadataPath, metadata);
+    } catch (err) {
+      // Rollback newly created files
+      for (const created of createdFiles) {
+        try {
+          if (fs.existsSync(created)) fs.unlinkSync(created);
+        } catch {}
+      }
+      throw new Error(`Installation failed and was rolled back: ${err.message}`);
+    }
   }
 
   return { success: true, plan };
 }
 
 /**
- * Uninstalls managed skills from target destination.
+ * Safely uninstalls managed skills from target destination.
+ * Checks checksums to protect user-modified files unless explicitly forced.
  */
 export function uninstallSkills({
   skillName,
@@ -376,6 +592,8 @@ export function uninstallSkills({
   all = false,
   destDir = '.',
   dryRun = false,
+  force = false,
+  repoRoot = REPO_ROOT,
 } = {}) {
   const safeDestRoot = assertSafeDestination(destDir);
   const metadataPath = path.join(safeDestRoot, '.envguard-skills.json');
@@ -390,30 +608,39 @@ export function uninstallSkills({
   let metadata;
   try {
     metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf8'));
+    validateMetadata(metadata, safeDestRoot);
   } catch (err) {
-    return { success: false, error: `Invalid metadata file: ${err.message}` };
+    return { success: false, error: `Uninstallation aborted: invalid or corrupted metadata: ${err.message}` };
   }
 
-  const allSkills = loadSkills();
-  const allPacks = loadPacks();
+  const allSkills = loadSkills(repoRoot);
+  const allPacks = loadPacks(repoRoot);
 
   let toRemove = [];
 
   if (all) {
     toRemove = Object.keys(metadata.skills || {});
   } else if (skillName) {
+    if (!metadata.skills?.[skillName]) {
+      return { success: false, error: `Skill "${skillName}" is not registered in installation metadata.` };
+    }
     toRemove = [skillName];
   } else if (packName) {
     const pack = allPacks.find((p) => p.id === packName);
     if (!pack) {
-      return { success: false, error: `Pack "${packName}" not found.` };
+      return { success: false, error: `Pack "${packName}" not found in catalog.` };
     }
     toRemove = pack.skills.filter((s) => metadata.skills[s]);
+    if (toRemove.length === 0) {
+      return { success: false, error: `No skills from pack "${packName}" are installed in destination.` };
+    }
   } else {
     return { success: false, error: 'Specify --skill, --pack, or --all to uninstall.' };
   }
 
   const actions = [];
+  const preserved = [];
+  const missing = [];
 
   for (const name of toRemove) {
     const record = metadata.skills?.[name];
@@ -421,7 +648,33 @@ export function uninstallSkills({
 
     for (const file of record.files || []) {
       const targetPath = assertSafeDestination(safeDestRoot, file.path);
+
+      if (!fs.existsSync(targetPath)) {
+        missing.push({
+          skill: name,
+          path: file.path,
+          reason: 'already missing on disk',
+        });
+        continue;
+      }
+
+      const currentContent = fs.readFileSync(targetPath, 'utf8');
+      const currentHash = sha256(currentContent);
+
+      if (currentHash !== file.sha256) {
+        // File has been modified by user!
+        if (!force) {
+          preserved.push({
+            skill: name,
+            path: file.path,
+            reason: 'modified by user (preserved; use --force to delete)',
+          });
+          continue;
+        }
+      }
+
       actions.push({
+        action: 'delete',
         skill: name,
         path: targetPath,
         relPath: file.path,
@@ -433,7 +686,7 @@ export function uninstallSkills({
     for (const item of actions) {
       if (fs.existsSync(item.path)) {
         fs.unlinkSync(item.path);
-        // Clean empty directory
+        // Clean empty parent directory if safe
         const parent = path.dirname(item.path);
         try {
           if (fs.readdirSync(parent).length === 0) {
@@ -441,17 +694,31 @@ export function uninstallSkills({
           }
         } catch {}
       }
-      delete metadata.skills[item.skill];
+    }
+
+    // Only remove skills from metadata where all files were removed or missing
+    const preservedSkillNames = new Set(preserved.map((p) => p.skill));
+    for (const name of toRemove) {
+      if (!preservedSkillNames.has(name)) {
+        delete metadata.skills[name];
+      }
     }
 
     if (Object.keys(metadata.skills || {}).length === 0) {
-      fs.unlinkSync(metadataPath);
+      if (fs.existsSync(metadataPath)) {
+        fs.unlinkSync(metadataPath);
+      }
     } else {
-      fs.writeFileSync(metadataPath, JSON.stringify(metadata, null, 2), 'utf8');
+      writeMetadataAtomic(metadataPath, metadata);
     }
   }
 
-  return { success: true, actions };
+  return {
+    success: true,
+    actions,
+    preserved,
+    missing,
+  };
 }
 
 // CLI Execution entrypoint
@@ -473,8 +740,19 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(__filename
         console.log(`  - ${s.name.padEnd(20)} [${s.pack}] : ${s.description.slice(0, 70)}...`);
       }
     } else if (command === 'sync') {
-      const result = syncSkills();
-      console.log(`Successfully synchronized ${result.syncedCount} skills to .agents/skills/.`);
+      const checkOnly = args.includes('--check');
+      const result = syncSkills({ checkOnly });
+      if (checkOnly) {
+        if (result.valid) {
+          console.log('✓ All skills in .agents/skills/ are fully synchronized.');
+        } else {
+          console.error('X Skill synchronization check failed:');
+          for (const issue of result.issues) console.error(`  - ${issue}`);
+          process.exit(1);
+        }
+      } else {
+        console.log(`Successfully synchronized ${result.syncedCount} skills to .agents/skills/.`);
+      }
     } else if (command === 'verify') {
       const result = verifySkills();
       if (result.valid) {
@@ -528,6 +806,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(__filename
       const all = args.includes('--all');
       const destDir = getArg('--dest') || '.';
       const dryRun = args.includes('--dry-run');
+      const force = args.includes('--force');
 
       const result = uninstallSkills({
         skillName,
@@ -535,6 +814,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(__filename
         all,
         destDir,
         dryRun,
+        force,
       });
 
       if (!result.success) {
@@ -546,6 +826,12 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(__filename
       for (const item of result.actions) {
         console.log(`  - [${item.skill}] -> ${item.relPath}`);
       }
+      for (const p of result.preserved) {
+        console.log(`  ! [${p.skill}] -> ${p.path} (${p.reason})`);
+      }
+      for (const m of result.missing) {
+        console.log(`  ? [${m.skill}] -> ${m.path} (${m.reason})`);
+      }
     } else {
       console.log('Usage: node tools/skill-manager.mjs [list|sync|verify|install|uninstall] [options]');
     }
@@ -554,4 +840,3 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(__filename
     process.exit(1);
   }
 }
-
