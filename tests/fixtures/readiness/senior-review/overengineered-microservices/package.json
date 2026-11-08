@@ -1,0 +1,9 @@
+{
+  "name": "overengineered-microservices",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Fragmented microservices architecture maintained by a small team",
+  "devDependencies": {
+    "typescript": "^5.4.5"
+  }
+}

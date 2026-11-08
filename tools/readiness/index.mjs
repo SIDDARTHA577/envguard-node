@@ -5,3 +5,5 @@ export * from './engine/index.mjs';
 export * from './adapters/index.mjs';
 export * from './policies/index.mjs';
 export * from './reporters/index.mjs';
+export * from './architecture/index.mjs';
+export * from './capacity/benchmark-runner.mjs';

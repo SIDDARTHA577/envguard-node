@@ -199,6 +199,30 @@
     "limitations": {
       "type": "array",
       "items": { "type": "string" }
+    },
+    "architecture": {
+      "type": "object",
+      "properties": {
+        "inventory": { "type": "object" },
+        "requirements": { "type": "object" },
+        "evaluations": {
+          "type": "array",
+          "items": { "type": "object" }
+        },
+        "tradeoffs": {
+          "type": "array",
+          "items": { "type": "object" }
+        },
+        "failureModes": {
+          "type": "array",
+          "items": { "type": "object" }
+        },
+        "capacityModel": { "type": "object" },
+        "adrs": {
+          "type": "array",
+          "items": { "type": "object" }
+        }
+      }
     }
   }
 }

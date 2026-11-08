@@ -1,0 +1,19 @@
+{
+  "name": "healthy-monolith",
+  "version": "1.0.0",
+  "description": "Production-ready modular monolith architecture with health checks and rate limiting",
+  "main": "src/server.ts",
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "express-rate-limit": "^7.3.1",
+    "pg": "^8.12.0",
+    "pino": "^9.2.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5",
+    "vitest": "^1.6.0"
+  }
+}

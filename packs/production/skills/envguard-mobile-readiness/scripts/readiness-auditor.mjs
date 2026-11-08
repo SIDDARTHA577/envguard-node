@@ -48,6 +48,19 @@ import {
   POLICY_OUTCOMES,
   formatJsonReport,
   generateMarkdownReport,
+  buildArchitectureInventory,
+  discoverArchitectureRequirements,
+  evaluateApplicability,
+  APPLICABILITY_LEVELS,
+  evaluateSystemDesignDecisions,
+  SYSTEM_DESIGN_CONCEPTS,
+  evaluateArchitectureTradeoffs,
+  analyzeFailureModes,
+  buildCapacityModel,
+  generate10kVirtualUserScenario,
+  generateArchitectureDecisionRecords,
+  formatArchitectureMarkdown,
+  runLocalBenchmark,
 } from './readiness/index.mjs';
 
 export {
@@ -90,6 +103,19 @@ export {
   POLICY_OUTCOMES,
   formatJsonReport,
   generateMarkdownReport,
+  buildArchitectureInventory,
+  discoverArchitectureRequirements,
+  evaluateApplicability,
+  APPLICABILITY_LEVELS,
+  evaluateSystemDesignDecisions,
+  SYSTEM_DESIGN_CONCEPTS,
+  evaluateArchitectureTradeoffs,
+  analyzeFailureModes,
+  buildCapacityModel,
+  generate10kVirtualUserScenario,
+  generateArchitectureDecisionRecords,
+  formatArchitectureMarkdown,
+  runLocalBenchmark,
 };
 
 // Backward-compatible individual check wrappers

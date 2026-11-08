@@ -1,0 +1,14 @@
+{
+  "name": "defective-architecture",
+  "version": "1.0.0",
+  "description": "Backend API with architectural defects including unbounded memory cache and missing fault tolerance",
+  "main": "src/server.ts",
+  "dependencies": {
+    "express": "^4.19.2",
+    "pg": "^8.12.0",
+    "bull": "^4.12.9"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5"
+  }
+}
