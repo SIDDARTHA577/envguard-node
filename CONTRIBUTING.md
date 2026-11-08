@@ -10,8 +10,8 @@ All contributors must adhere to our [Code of Conduct](./CODE_OF_CONDUCT.md). Ple
 
 ### Prerequisites
 
-- Node.js >= 18.0.0
-- npm >= 9.0.0
+- Node.js maintained LTS (`^22.0.0 || ^24.0.0 || ^26.0.0`)
+- npm >= 10.0.0
 
 ### Getting Started
 

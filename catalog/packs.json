@@ -35,12 +35,6 @@
       "envguard-production-readiness",
       "envguard-mobile-readiness",
       "envguard-senior-engineer-review",
-      "envguard-test-engineer",
-      "envguard-security-audit",
-      "envguard-accessibility",
-      "envguard-devops",
-      "envguard-observability",
-      "envguard-production-review",
       "envguard-load-test"
     ]
   }

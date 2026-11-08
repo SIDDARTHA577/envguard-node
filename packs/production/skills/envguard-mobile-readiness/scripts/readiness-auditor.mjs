@@ -48,6 +48,9 @@ import {
   POLICY_OUTCOMES,
   formatJsonReport,
   generateMarkdownReport,
+  generateProfessionalEngineeringReport,
+  compareReadinessReports,
+  formatComparisonMarkdown,
   buildArchitectureInventory,
   discoverArchitectureRequirements,
   REQUIREMENT_SOURCES,
@@ -110,6 +113,9 @@ export {
   POLICY_OUTCOMES,
   formatJsonReport,
   generateMarkdownReport,
+  generateProfessionalEngineeringReport,
+  compareReadinessReports,
+  formatComparisonMarkdown,
   buildArchitectureInventory,
   discoverArchitectureRequirements,
   REQUIREMENT_SOURCES,
@@ -223,6 +229,7 @@ export function main(argv = process.argv.slice(2)) {
   let execCommands = null;
   let timeoutMs = 10000;
   let sarifPath = null;
+  let compareFiles = null;
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -233,6 +240,7 @@ Evidence-based application production readiness analyzer.
 
 Usage:
   node tools/readiness-auditor.mjs [scan] [options]
+  node tools/readiness-auditor.mjs --compare <before.json> <after.json> [options]
 
 Options:
   --project <dir>          Path to project directory (default: current directory)
@@ -244,6 +252,7 @@ Options:
   --trust-project          Explicitly acknowledge executing scripts on unisolated host without container containment
   --exec-commands <list>   Comma-separated list of allowed scripts to execute (e.g. "test,build")
   --preview-commands       Preview planned commands and their network/filesystem effects without running them
+  --compare <b.json> <a.json>  Compare before vs after readiness reports to verify remediation
   --sarif <file>           Path to SARIF report to import static analysis findings (CodeQL, ESLint, Trivy)
   --timeout <ms>           Maximum execution time per command in ms (default: 10000, max: 120000)
   --help, -h               Show this help message
@@ -264,6 +273,14 @@ Safety Boundaries:
       return EXIT_CODES.SUCCESS_NO_BLOCKERS;
     } else if (arg === 'scan') {
       // optional subcommand keyword
+    } else if (arg === '--compare') {
+      const beforeVal = argv[++i];
+      const afterVal = argv[++i];
+      if (!beforeVal || beforeVal.startsWith('--') || !afterVal || afterVal.startsWith('--')) {
+        console.error('Error: Option "--compare" requires two JSON report file paths: <before-report.json> <after-report.json>.');
+        return EXIT_CODES.INVALID_ARGUMENTS;
+      }
+      compareFiles = [beforeVal, afterVal];
     } else if (arg === '--project') {
       const val = argv[++i];
       if (!val || val.startsWith('--')) {
@@ -335,6 +352,72 @@ Safety Boundaries:
       console.error(`Error: Unrecognized option "${arg}". Run with --help for valid options.`);
       return EXIT_CODES.INVALID_ARGUMENTS;
     }
+  }
+
+  // Handle report comparison mode (--compare <before> <after>)
+  if (compareFiles) {
+    const [beforePath, afterPath] = compareFiles;
+    let beforeJson, afterJson;
+    try {
+      if (!fs.existsSync(beforePath)) {
+        console.error(`Error: Before report file not found: "${beforePath}"`);
+        return EXIT_CODES.INVALID_ARGUMENTS;
+      }
+      if (!fs.existsSync(afterPath)) {
+        console.error(`Error: After report file not found: "${afterPath}"`);
+        return EXIT_CODES.INVALID_ARGUMENTS;
+      }
+      beforeJson = JSON.parse(fs.readFileSync(beforePath, 'utf8'));
+      afterJson = JSON.parse(fs.readFileSync(afterPath, 'utf8'));
+    } catch (err) {
+      console.error(`Error parsing report JSON for comparison: ${err.message}`);
+      return EXIT_CODES.INVALID_ARGUMENTS;
+    }
+
+    let comparison;
+    try {
+      comparison = compareReadinessReports(beforeJson, afterJson);
+    } catch (err) {
+      console.error(`Error comparing readiness reports: ${err.message}`);
+      return EXIT_CODES.TOOL_ERROR;
+    }
+
+    const comparisonJson = JSON.stringify(comparison, null, 2);
+    const comparisonMd = formatComparisonMarkdown(comparison);
+
+    if (outputDir) {
+      try {
+        const safeOutDir = assertSafeOutputDir(outputDir);
+        if (!fs.existsSync(safeOutDir)) {
+          fs.mkdirSync(safeOutDir, { recursive: true });
+        }
+        const targetFormat = format || 'both';
+        if (targetFormat === 'json' || targetFormat === 'both') {
+          const jsonOutPath = path.join(safeOutDir, 'readiness-comparison.json');
+          fs.writeFileSync(jsonOutPath, comparisonJson, 'utf8');
+          console.log(`Saved comparison JSON report to: ${jsonOutPath}`);
+        }
+        if (targetFormat === 'markdown' || targetFormat === 'both') {
+          const mdOutPath = path.join(safeOutDir, 'readiness-comparison.md');
+          fs.writeFileSync(mdOutPath, comparisonMd, 'utf8');
+          console.log(`Saved comparison Markdown report to: ${mdOutPath}`);
+        }
+      } catch (err) {
+        console.error(`Error writing comparison output to "${outputDir}": ${err.message}`);
+        return EXIT_CODES.TOOL_ERROR;
+      }
+    } else {
+      if (format === 'json') {
+        console.log(comparisonJson);
+      } else {
+        console.log(comparisonMd);
+      }
+    }
+
+    if (comparison.statusTransition.regressed || comparison.after.policyOutcome === 'BLOCKED') {
+      return EXIT_CODES.POLICY_BLOCKERS;
+    }
+    return EXIT_CODES.SUCCESS_NO_BLOCKERS;
   }
 
   // Validate project path

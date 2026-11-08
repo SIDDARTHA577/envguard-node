@@ -21,29 +21,31 @@
 
 Based on Anthropic's published criteria for the **Claude for Open Source** program (`claude.com/contact-sales/claude-for-oss`):
 
-| Program Requirement / Benchmark | Minimum Qualification Criteria | Current Verified Status for `envguard-node` | Eligibility Verdict |
-|---|---|---|---|
-| **OSI-Compliant Open-Source License** | Repository must use an approved open-source license (MIT, Apache-2.0, BSD, etc.). | **MIT License** included in root `LICENSE` file. | :white_check_mark: **Satisfied** |
-| **Maintainer Identity & Role** | Authentic maintainer or core contributor with verifiable public activity. | Active maintainer (`SIDDARTHA577`) on GitHub. | :white_check_mark: **Satisfied** |
-| **Public Repository Accessibility** | Publicly accessible repository with clear documentation and tests. | Public GitHub repository with README, test suite, and CI workflows. | :white_check_mark: **Satisfied** |
-| **Ecosystem Adoption / Dependents** | Benchmark: 500+ or 1,000+ dependent repositories OR 200,000+ monthly registry downloads. | Newly created project (v1.0.0). 0 dependent repos, 0 downloads. | :x: **Not Yet Met** (Goal) |
-| **Repository Popularity / Impact** | Benchmark: 5,000+ GitHub stars OR OpenSSF Criticality Score $\ge 0.4$. | Newly published repository. | :x: **Not Yet Met** (Goal) |
-| **External Collaboration** | Benchmark: 20+ unique external contributors with merged PRs in the preceding 12 months. | 0 external contributors at baseline. | :x: **Not Yet Met** (Goal) |
-| **Contributor Track Record** | Benchmark: 100+ merged PRs in public external repositories you do not own over preceding 12 months. | Subject to maintainer's broader GitHub history across other repositories. | :clipboard: **Requires Individual Audit** |
+| Program Requirement / Benchmark | Minimum Qualification Criteria | Current Verified Status for `envguard-node` | Eligibility Verdict | Status Classification |
+|---|---|---|---|:---:|
+| **OSI-Compliant Open-Source License** | Repository must use an approved open-source license (MIT, Apache-2.0, BSD, etc.). | **MIT License** included in root `LICENSE` file. | :white_check_mark: **Satisfied** | `VERIFIED` |
+| **Maintainer Identity & Role** | Authentic maintainer or core contributor with verifiable public activity. | Active maintainer (`SIDDARTHA577`) on GitHub. | :white_check_mark: **Satisfied** | `VERIFIED` |
+| **Public Repository Accessibility** | Publicly accessible repository with clear documentation and tests. | Public GitHub repository with README, comprehensive test suite, and CI workflows. | :white_check_mark: **Satisfied** | `VERIFIED` |
+| **Multi-Platform CI Testing** | Automated testing matrix ensuring software reliability across environments. | GitHub Actions CI matrix running Node 22, 24, 26 on Ubuntu & Windows + CodeQL. | :white_check_mark: **Satisfied** | `VERIFIED` |
+| **Ecosystem Adoption / Dependents** | Benchmark: 500+ or 1,000+ dependent repositories OR 200,000+ monthly registry downloads. | Pre-release development package. 0 dependent repos, 0 public downloads. | :x: **Not Met** | `FUTURE GOAL` |
+| **Repository Popularity / Impact** | Benchmark: 5,000+ GitHub stars OR OpenSSF Criticality Score $\ge 0.4$. | Newly authored open-source repository. | :x: **Not Met** | `FUTURE GOAL` |
+| **External Collaboration** | Benchmark: 20+ unique external contributors with merged PRs in preceding 12 months. | 0 external contributors at baseline (single maintainer). | :x: **Not Met** | `FUTURE GOAL` |
+| **Maintainer External Track Record** | Benchmark: 100+ merged PRs in public external repositories not owned over preceding 12 months. | Depends on individual maintainer portfolio outside `envguard-node`. | :clipboard: **Individual Audit Needed** | `NOT VERIFIED` |
 
 ---
 
-## 3. Verified Metrics Baseline (As of Initial Release)
+## 3. Verified Metrics Baseline (As of Pre-Release Stage)
 
-* **Current Release**: `v1.0.0`
-* **Verified npm Downloads**: `0` (pending initial package publication)
-* **Dependent Repositories**: `0`
-* **External Contributors**: `0`
-* **Merged Pull Requests**: `0` (initial release committed to main branch)
+* **Current Baseline**: Pre-release under active development (version `1.0.0` in `package.json`).
+* **Verified npm Downloads**: `0` (package has NOT been published to npm).
+* **Dependent Repositories**: `0` (verified via GitHub dependency network).
+* **External Contributors**: `0` (maintained by `SIDDARTHA577`).
+* **Completed Pull Requests on `main`**: 17 merged PRs (PR #1 through PR #17) across platform architecture, readiness testing, security heuristics, capacity modeling, and developer tooling.
+* **Release Policy**: Public npm publication and Git release tags are strictly deferred until complete maintainer sign-off.
 * **Known Limitations**:
-  * Single-maintainer project at initial launch.
+  * Single-maintainer project at current stage.
   * Adoption metrics are at baseline zero.
-  * Programmatic schema supports common standard data types (strings, numbers, integers, booleans, ports, URLs, enums) and custom validators; deep nested object structures require JSON schema compositions.
+  * Programmatic schema supports standard data types (strings, numbers, integers, booleans, ports, URLs, enums) and custom validators; deep nested object structures require JSON schema compositions.
 
 ---
 

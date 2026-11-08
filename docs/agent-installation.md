@@ -31,8 +31,17 @@ node tools/skill-manager.mjs install --pack core --dest /path/to/my-project --ta
 # Install production readiness pack (includes bundled readiness auditor)
 node tools/skill-manager.mjs install --pack production --dest /path/to/my-project --target codex
 
-# Install core pack for Google Antigravity or Claude Code (skills/)
+# Install core pack for Google Antigravity (skills/)
 node tools/skill-manager.mjs install --pack core --dest /path/to/my-project --target antigravity
+
+# Install core pack for Claude Code (.claude/skills/)
+node tools/skill-manager.mjs install --pack core --dest /path/to/my-project --target claude-code
+
+# Install core pack for Cursor (.cursor/skills/)
+node tools/skill-manager.mjs install --pack core --dest /path/to/my-project --target cursor
+
+# Install skills from a local unpacked tarball or cloned repository source
+node tools/skill-manager.mjs install --pack fullstack --dest /path/to/my-project --source /path/to/source-repo
 
 # Install a single skill
 node tools/skill-manager.mjs install --skill envguard-audit --dest /path/to/my-project
@@ -42,6 +51,9 @@ node /path/to/my-project/.agents/skills/envguard-production-readiness/scripts/re
 
 # Preview planned commands and effects without execution
 node /path/to/my-project/.agents/skills/envguard-production-readiness/scripts/readiness-auditor.mjs scan --project /path/to/my-project --preview-commands
+
+# Compare before vs after reports to verify defect remediation
+node /path/to/my-project/.agents/skills/envguard-production-readiness/scripts/readiness-auditor.mjs --compare before.json after.json --output-dir ./reports
 
 # Remove installed skills cleanly
 node tools/skill-manager.mjs uninstall --pack production --dest /path/to/my-project

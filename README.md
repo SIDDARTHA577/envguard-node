@@ -74,59 +74,77 @@ Zero runtime dependencies. Pure Node.js standard libraries only (`node:fs`, `nod
 
 ---
 
-## 4. Installation & Setup
+## 4. Installation & Architecture Layers
 
-### Package Name vs CLI Executable Name
+EnvGuard is architected as two decoupled layers:
 
-| Entity | Identifier | Description |
-|---|---|---|
-| **npm package name** | `envguard-node` | The official package published on the registry / installed in `package.json`. |
-| **CLI command name** | `envguard` | The executable binary declared in `package.json` `bin`. |
-
-> [!WARNING]
-> Do NOT run `npx envguard` without the package installed locally. Running `npx <name>` when not installed locally can cause npm to download an unrelated third-party package named `envguard`. Always use the commands documented below.
-
-### Pre-Release Source / Tarball Installation (Current Tested Workflow)
-
-Since `envguard-node` is not yet on the public npm registry, install from source or a local tarball:
-
-```bash
-# Clone the repository
-git clone https://github.com/SIDDARTHA577/envguard-node.git
-cd envguard-node
-
-# Install dependencies and build
-npm ci
-npm run build
-
-# Option A: Build and install a self-contained tarball into your project
-npm pack
-cd /path/to/your-project
-npm install /path/to/envguard-node/envguard-node-1.0.0.tgz
-
-# Option B: Link globally for local development
-cd /path/to/envguard-node
-npm link
-cd /path/to/your-project
-npm link envguard-node
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ Layer A: EnvGuard Core (Zero Runtime Dependencies)              │
+│ • Package: envguard-node                                        │
+│ • Runtime: Pure Node.js standard library                        │
+│ • API: guard(), s, defineSchema(), CLI binary (envguard)       │
+└─────────────────────────────────────────────────────────────────┘
+                                ▲
+                                │ Consumed by
+┌─────────────────────────────────────────────────────────────────┐
+│ Layer B: Developer Platform & Production Readiness Tooling       │
+│ • Layer B1: 18 AI Agent Skills (Codex, Antigravity, Claude, Cursor)│
+│ • Layer B2: Multi-Platform Readiness Auditor (12 Domains, CLI)  │
+│ • Workflows: Scan, Report, Preview Commands, Compare & Verify   │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-### Post-Publication npm Installation Workflow (After Official Release)
-
-*The following commands will apply once the package is published to the public registry:*
+### Layer A: EnvGuard Core Library & CLI
+- **Package Name**: `envguard-node`
+- **CLI Executable**: `envguard` (e.g. `npx --no-install envguard check`)
+- **Runtime Dependencies**: `0` (independent, zero third-party runtime dependencies)
 
 ```bash
-# 1. Install as a project runtime dependency
+# Production installation (once published to npm registry):
 npm install envguard-node
+# Or with pnpm / yarn:
+pnpm add envguard-node
 
-# 2. Or install as a project development dependency for CLI usage
-npm install --save-dev envguard-node
+# Pre-release local source installation (tested baseline):
+npm pack
+npm install /path/to/envguard-node/envguard-node-1.0.0.tgz
+```
 
-# 3. Execute the locally installed CLI binary safely:
-npx --no-install envguard check
+### Layer B1: AI Coding Agent Skills
+EnvGuard packages 18 specialized skills across 3 curated packs:
+- **`core`** (5 skills): `envguard-audit`, `envguard-setup`, `envguard-review`, `envguard-ci`, `envguard-migrate`
+- **`fullstack`** (9 skills): `envguard-system-design`, `envguard-backend`, `envguard-database`, `envguard-frontend`, `envguard-fullstack-integration`, `envguard-ui-design`, `envguard-api-design`, `envguard-code-review`, `envguard-accessibility`
+- **`production`** (4 skills): `envguard-production-readiness`, `envguard-mobile-readiness`, `envguard-senior-engineer-review`, `envguard-load-test`
 
-# 4. Or explicitly specify the package via npm exec:
-npm exec --package=envguard-node -- envguard check
+```bash
+# Install skills into target project for OpenAI Codex (.agents/skills/):
+node tools/skill-manager.mjs install --pack core --dest /path/to/project --target codex
+
+# Install for Google Antigravity (skills/):
+node tools/skill-manager.mjs install --pack fullstack --dest /path/to/project --target antigravity
+
+# Install for Claude Code (.claude/skills/):
+node tools/skill-manager.mjs install --pack core --dest /path/to/project --target claude-code
+
+# Install for Cursor (.cursor/skills/):
+node tools/skill-manager.mjs install --pack core --dest /path/to/project --target cursor
+```
+
+### Layer B2: Multi-Platform Production Readiness Auditor
+Audit any backend, web, mobile, or monorepo project against 12 engineering domains:
+
+```bash
+# Golden-Path 3-Step Workflow:
+
+# 1. Audit: Scan project in read-only mode by default
+node tools/readiness-auditor.mjs scan --project . --output-dir ./reports --format both
+
+# 2. Preview Execution: Review planned test/build commands before authorizing
+node tools/readiness-auditor.mjs scan --project . --preview-commands
+
+# 3. Verify & Remediate: Compare baseline report against remediated report
+node tools/readiness-auditor.mjs --compare reports/before.json reports/after.json --output-dir ./reports
 ```
 
 ---
