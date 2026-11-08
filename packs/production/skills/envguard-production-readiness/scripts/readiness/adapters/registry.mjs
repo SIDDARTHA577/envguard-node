@@ -4,6 +4,10 @@ import { NodeTypeScriptAdapter } from './node-typescript-adapter.mjs';
 import { NextJsReactAdapter } from './nextjs-react-adapter.mjs';
 import { PythonAdapter } from './python-adapter.mjs';
 import { JavaSpringBootAdapter } from './java-spring-adapter.mjs';
+import { ReactNativeAdapter } from './react-native-adapter.mjs';
+import { FlutterAdapter } from './flutter-adapter.mjs';
+import { AndroidAdapter } from './android-adapter.mjs';
+import { IosAdapter } from './ios-adapter.mjs';
 
 /**
  * Adapter Registry for EnvGuard Assessment Engine.
@@ -102,5 +106,9 @@ export function createDefaultRegistry() {
   registry.register(new NextJsReactAdapter());
   registry.register(new PythonAdapter());
   registry.register(new JavaSpringBootAdapter());
+  registry.register(new ReactNativeAdapter());
+  registry.register(new FlutterAdapter());
+  registry.register(new AndroidAdapter());
+  registry.register(new IosAdapter());
   return registry;
 }

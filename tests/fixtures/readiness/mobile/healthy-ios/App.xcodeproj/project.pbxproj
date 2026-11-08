@@ -1,0 +1,16 @@
+// !$*UTF8*$!
+{
+    archiveVersion = 1;
+    classes = {
+    };
+    objectVersion = 56;
+    objects = {
+        XCBuildConfiguration = {
+            buildSettings = {
+                IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+                PRODUCT_NAME = HealthyIOS;
+            };
+        };
+    };
+    rootObject = 1;
+}
