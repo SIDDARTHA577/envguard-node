@@ -217,9 +217,10 @@ export function resolveTargetDirForHost(skillName, targetHost) {
   }
   switch (targetHost) {
     case 'antigravity':
+      return path.join('skills', skillName);
     case 'claude':
     case 'claude-code':
-      return path.join('skills', skillName);
+      return path.join('.claude', 'skills', skillName);
     case 'cursor':
       return path.join('.cursor', 'skills', skillName);
     case 'codex':
@@ -926,6 +927,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(__filename
       const packName = getArg('--pack');
       const destDir = getArg('--dest') || '.';
       const targetHost = getArg('--target') || 'codex';
+      const sourceDir = getArg('--source') || getArg('--repo-root') || REPO_ROOT;
       const dryRun = args.includes('--dry-run');
       const force = args.includes('--force');
 
@@ -936,6 +938,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(__filename
         targetHost,
         dryRun,
         force,
+        repoRoot: sourceDir,
       });
 
       if (!result.success) {
@@ -960,6 +963,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(__filename
       const packName = getArg('--pack');
       const all = args.includes('--all');
       const destDir = getArg('--dest') || '.';
+      const sourceDir = getArg('--source') || getArg('--repo-root') || REPO_ROOT;
       const dryRun = args.includes('--dry-run');
       const force = args.includes('--force');
 
@@ -970,6 +974,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(__filename
         destDir,
         dryRun,
         force,
+        repoRoot: sourceDir,
       });
 
       if (!result.success) {

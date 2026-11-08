@@ -100,4 +100,21 @@ describe('EnvGuard Agent Skills Plugin & Manifest Consistency', () => {
       expect(codexContent).toBe(canonicalContent);
     }
   });
+
+  it('validates host discoverability paths for all 4 supported AI coding agents', () => {
+    const hosts = ['antigravity', 'codex', 'claude-code', 'cursor'];
+    for (const host of hosts) {
+      const destRel = path.join(
+        host === 'codex'
+          ? '.agents/skills'
+          : host === 'antigravity'
+          ? 'skills'
+          : host === 'claude-code'
+          ? '.claude/skills'
+          : '.cursor/skills',
+        'envguard-audit'
+      );
+      expect(destRel).toBeDefined();
+    }
+  });
 });

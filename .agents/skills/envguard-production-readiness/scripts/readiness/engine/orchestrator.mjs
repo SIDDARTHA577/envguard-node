@@ -16,7 +16,7 @@ import { importSarifReport } from './sarif.mjs';
 import { runProjectCommand, isEnvironmentIsolated } from '../execution/runner.mjs';
 import { evaluateReleasePolicy } from '../policies/release-policy.mjs';
 import { formatJsonReport } from '../reporters/json-reporter.mjs';
-import { generateMarkdownReport } from '../reporters/markdown-reporter.mjs';
+import { generateMarkdownReport, generateProfessionalEngineeringReport } from '../reporters/markdown-reporter.mjs';
 import {
   buildArchitectureInventory,
   discoverArchitectureRequirements,
@@ -249,6 +249,53 @@ export function runReadinessAudit({
     findings: filteredFindings,
     limitations: Array.from(limitations),
     architecture: architecturePayload || undefined,
+    sections: {
+      projectOverview: {
+        projectRoot: path.basename(safeProjectDir),
+        gitCommit: inventory.repository.gitCommit,
+        applications: inventory.applications,
+      },
+      architecture: architecturePayload,
+      codeQuality: {
+        findings: filteredFindings.filter((f) => f.category === 'build_test'),
+      },
+      security: {
+        findings: filteredFindings.filter((f) => f.category === 'security' || f.category === 'env'),
+      },
+      database: {
+        findings: filteredFindings.filter((f) => f.category === 'database'),
+      },
+      frontend: {
+        findings: filteredFindings.filter((f) => f.category === 'accessibility'),
+      },
+      mobile: {
+        findings: filteredFindings.filter(
+          (f) =>
+            f.adapterId?.includes('mobile') ||
+            f.adapterId?.includes('react-native') ||
+            f.adapterId?.includes('flutter') ||
+            f.adapterId?.includes('android') ||
+            f.adapterId?.includes('ios')
+        ),
+      },
+      performance: {
+        findings: filteredFindings.filter((f) => f.category === 'performance'),
+        capacityModel: architecturePayload?.capacityModel,
+      },
+      reliability: {
+        failureModes: architecturePayload?.failureModes,
+      },
+      priorityRecommendations: {
+        p0: filteredFindings.filter((f) => f.status === 'FAIL'),
+        p1: filteredFindings.filter((f) => f.status === 'WARNING' && f.severity === 'high'),
+        p2: filteredFindings.filter((f) => f.status === 'WARNING' && f.severity !== 'high'),
+      },
+      evidence: {
+        findingsWithEvidence: filteredFindings.filter((f) => f.evidence?.file || f.evidence?.command),
+        limitations: Array.from(limitations),
+      },
+      releaseRecommendation: policyEvaluation,
+    },
   };
 
   // 8. Write reports if outputDir is specified
@@ -268,6 +315,10 @@ export function runReadinessAudit({
       const mdPath = path.join(safeOutDir, 'readiness-report.md');
       fs.writeFileSync(mdPath, generateMarkdownReport(report), 'utf8');
       console.log(`Saved Markdown readiness report to: ${mdPath}`);
+
+      const engMdPath = path.join(safeOutDir, 'engineering-report.md');
+      fs.writeFileSync(engMdPath, generateProfessionalEngineeringReport(report), 'utf8');
+      console.log(`Saved Professional Engineering report to: ${engMdPath}`);
     }
   }
 
