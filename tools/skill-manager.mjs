@@ -267,6 +267,80 @@ export function collectSkillFiles(skillCanonicalDir) {
   return files;
 }
 
+export const BUNDLED_READINESS_SKILLS = [
+  'packs/production/skills/envguard-production-readiness',
+  'packs/production/skills/envguard-senior-engineer-review',
+  'packs/production/skills/envguard-load-test',
+  'packs/production/skills/envguard-mobile-readiness',
+];
+
+/**
+ * Synchronizes canonical readiness executable engine from tools/ into bundled skills.
+ */
+export function syncCanonicalExecutables({ repoRoot = REPO_ROOT, checkOnly = false } = {}) {
+  const issues = [];
+  const canonicalAuditorPath = path.join(repoRoot, 'tools', 'readiness-auditor.mjs');
+  const canonicalReadinessDir = path.join(repoRoot, 'tools', 'readiness');
+
+  if (!fs.existsSync(canonicalAuditorPath) || !fs.existsSync(canonicalReadinessDir)) {
+    return { valid: true, issues: [] };
+  }
+
+  const canonicalAuditorHash = sha256(fs.readFileSync(canonicalAuditorPath));
+
+  // Collect all canonical readiness files and their hashes
+  const canonicalFiles = [];
+  function walkCanonical(dir) {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walkCanonical(full);
+      } else if (entry.isFile()) {
+        const rel = path.relative(canonicalReadinessDir, full).replace(/\\/g, '/');
+        canonicalFiles.push({ rel, full, hash: sha256(fs.readFileSync(full)) });
+      }
+    }
+  }
+  walkCanonical(canonicalReadinessDir);
+
+  for (const skillRelDir of BUNDLED_READINESS_SKILLS) {
+    const targetSkillDir = path.join(repoRoot, skillRelDir);
+    if (!fs.existsSync(targetSkillDir)) continue;
+
+    const targetAuditor = path.join(targetSkillDir, 'scripts', 'readiness-auditor.mjs');
+    const targetReadinessDir = path.join(targetSkillDir, 'scripts', 'readiness');
+
+    if (checkOnly) {
+      if (!fs.existsSync(targetAuditor)) {
+        issues.push(`Missing executable readiness-auditor.mjs in ${skillRelDir}/scripts/`);
+      } else if (sha256(fs.readFileSync(targetAuditor)) !== canonicalAuditorHash) {
+        issues.push(`Stale executable readiness-auditor.mjs in ${skillRelDir}/scripts/`);
+      }
+
+      for (const cf of canonicalFiles) {
+        const targetFile = path.join(targetReadinessDir, cf.rel);
+        if (!fs.existsSync(targetFile)) {
+          issues.push(`Missing executable readiness/${cf.rel} in ${skillRelDir}/scripts/`);
+        } else if (sha256(fs.readFileSync(targetFile)) !== cf.hash) {
+          issues.push(`Stale executable readiness/${cf.rel} in ${skillRelDir}/scripts/`);
+        }
+      }
+    } else {
+      // Sync
+      fs.mkdirSync(path.join(targetSkillDir, 'scripts'), { recursive: true });
+      fs.copyFileSync(canonicalAuditorPath, targetAuditor);
+
+      for (const cf of canonicalFiles) {
+        const targetFile = path.join(targetReadinessDir, cf.rel);
+        fs.mkdirSync(path.dirname(targetFile), { recursive: true });
+        fs.copyFileSync(cf.full, targetFile);
+      }
+    }
+  }
+
+  return { valid: issues.length === 0, issues };
+}
+
 /**
  * Synchronizes canonical skills to .agents/skills/ and updates host manifests.
  * Also supports checking synchronization (--check) without modifying disk.
@@ -277,6 +351,12 @@ export function syncSkills({ repoRoot = REPO_ROOT, checkOnly = false } = {}) {
 
   const issues = [];
   let syncedCount = 0;
+
+  // 1. Sync or check canonical executables into bundled skills
+  const execSyncResult = syncCanonicalExecutables({ repoRoot, checkOnly });
+  if (!execSyncResult.valid) {
+    issues.push(...execSyncResult.issues);
+  }
 
   for (const skill of skills) {
     const srcDir = path.join(repoRoot, skill.canonicalDir);
@@ -424,6 +504,14 @@ export function verifySkills(repoRoot = REPO_ROOT) {
           `Skill ${skill.name} is out of sync between ${skill.canonicalDir} and .agents/skills/${skill.name}.`
         );
       }
+    }
+  }
+
+  // 8. Check synchronization of bundled generated executables
+  const execCheck = syncCanonicalExecutables({ repoRoot, checkOnly: true });
+  if (!execCheck.valid) {
+    for (const issue of execCheck.issues) {
+      errors.push(`${issue} Run "npm run skills:sync" to synchronize with canonical sources.`);
     }
   }
 

@@ -58,7 +58,25 @@ export function evaluateSystemDesignDecisions(projectDir, inventory, requirement
 
   for (const conceptId of SYSTEM_DESIGN_CONCEPTS) {
     const applicability = evaluateApplicability(conceptId, inventory, requirements);
-    const evaluation = evaluateSingleConcept(conceptId, applicability, inventory, requirements, files, cleanSourceText, readFileSafe, projectDir);
+    const rawEval = evaluateSingleConcept(conceptId, applicability, inventory, requirements, files, cleanSourceText, readFileSafe, projectDir);
+
+    // Enrich evaluation with complete 12 architectural dimensions
+    const evaluation = {
+      ...rawEval,
+      applicability,
+      evidence: rawEval.evidence || {},
+      confidence: rawEval.confidence || applicability.confidence || 'medium',
+      currentImplementation: rawEval.currentImplementation || (rawEval.isImplemented ? 'Detected in source/configuration' : 'Not detected in source/configuration'),
+      verifiedBehavior: rawEval.verifiedBehavior || (rawEval.isWorkingAsIntended ? 'Verified configuration patterns present' : 'Unverified or missing configuration patterns'),
+      missingVerification: rawEval.missingVerification || (rawEval.isImplemented ? 'Operational runtime telemetry or staging load test verification' : 'Configuration and deployment implementation'),
+      risks: rawEval.risksAndFailureModes || rawEval.risks || ['Operational complexity and configuration drift'],
+      operationalCosts: rawEval.costs || 'Low to moderate hosting and engineering overhead',
+      tradeoffs: rawEval.tradeoffs || `${rawEval.problemSolved || rawEval.name}. Risks: ${(rawEval.risksAndFailureModes || [])[0] || 'Operational complexity'}.`,
+      recommendation: rawEval.finding?.recommendation || (rawEval.status === 'HEALTHY' ? 'Maintain current implementation and monitor telemetry.' : `Evaluate ${rawEval.name} according to application requirements.`),
+      requiredValidation: rawEval.validationMethod || 'Staging load test and operational telemetry verification',
+      humanApprovalNeeded: true,
+    };
+
     evaluations.push(evaluation);
 
     if (evaluation.finding) {
@@ -89,8 +107,28 @@ function evaluateSingleConcept(conceptId, applicability, inventory, requirements
       let status = 'NOT_APPLICABLE';
       let finding = null;
 
+      const infraComp = inventory.components.find((c) => c.type === 'infrastructure');
+      const hasSingleReplicaK8s = infraComp?.hasSingleReplicaK8s;
+
       if (!applicability.applicable) {
         status = 'NOT_APPLICABLE';
+      } else if (hasSingleReplicaK8s) {
+        status = 'DEFECTIVE';
+        finding = {
+          id: 'ARCH-K8S-SPOF-001',
+          category: 'deployment',
+          status: 'WARNING',
+          severity: 'medium',
+          title: 'Kubernetes Single-Replica Deployment (Single Point of Failure Risk)',
+          explanation:
+            'Kubernetes deployment manifest specifies replicas: 1. A Kubernetes manifest does not prove high-availability or multi-instance reliability; a single replica presents an outage risk during node drain, rolling updates, or pod rescheduling.',
+          evidence: { file: files.find((f) => /k8s|kubernetes/i.test(f)) || '.' },
+          checkMethod: 'static_analysis',
+          recommendation:
+            'Increase Kubernetes deployment replicas to at least 2 and configure a PodDisruptionBudget (PDB) to eliminate single-pod SPOF.',
+          manualVerificationRequired: false,
+          confidence: 'verified_fact',
+        };
       } else if (hasHealthCheck) {
         status = 'HEALTHY';
       } else if (!hasHealthCheck && inventory.counts.services > 0) {
@@ -145,6 +183,9 @@ function evaluateSingleConcept(conceptId, applicability, inventory, requirements
       let status = 'NOT_APPLICABLE';
       let finding = null;
 
+      const hasCacheLibrary = /lru-cache|node-cache|memcached/i.test(allSourceText);
+      const isImplemented = Boolean(usesRedis || hasUnboundedMemoryCache || hasCacheLibrary);
+
       if (hasUnboundedMemoryCache) {
         status = 'DEFECTIVE';
         finding = {
@@ -160,9 +201,9 @@ function evaluateSingleConcept(conceptId, applicability, inventory, requirements
           manualVerificationRequired: false,
           confidence: 'verified_fact',
         };
-      } else if (usesRedis) {
+      } else if (usesRedis || hasCacheLibrary) {
         status = 'HEALTHY';
-      } else if (applicability.applicable) {
+      } else if (applicability.applicable && applicability.level === APPLICABILITY_LEVELS.RECOMMENDED) {
         status = 'RECOMMENDED';
       }
 
@@ -171,9 +212,9 @@ function evaluateSingleConcept(conceptId, applicability, inventory, requirements
         name: 'Caching (In-Memory & Distributed Stores)',
         problemSolved: 'Stores expensive database query results or rendered HTML fragments in fast RAM to reduce response latency and lower database load.',
         signalsOfRelevance: ['Read-to-write ratio > 5:1', 'Repetitive database queries on hot tables', 'Tail latency reduction targets (p95 < 100ms)'],
-        isImplemented: usesRedis || !hasUnboundedMemoryCache,
-        evidence: { usesRedis, hasUnboundedMemoryCache },
-        isWorkingAsIntended: !hasUnboundedMemoryCache,
+        isImplemented,
+        evidence: { usesRedis, hasUnboundedMemoryCache, hasCacheLibrary },
+        isWorkingAsIntended: isImplemented && !hasUnboundedMemoryCache,
         risksAndFailureModes: ['Cache stampede / thundering herd on key expiry', 'Stale read anomalies after concurrent mutations', 'Memory exhaustion'],
         alternatives: ['Database read replicas with query optimization', 'HTTP HTTP Cache-Control headers', 'Application-level memoization'],
         costs: 'Managed Redis cluster ($20-$100+/mo); internal memory usage overhead.',
@@ -269,7 +310,7 @@ function evaluateSingleConcept(conceptId, applicability, inventory, requirements
       let status = 'NOT_APPLICABLE';
       let finding = null;
 
-      if (isMicroservices && (requirements.teamSize === 'solo' || requirements.teamSize?.includes('small'))) {
+      if (isMicroservices && applicability.level === APPLICABILITY_LEVELS.NOT_RECOMMENDED) {
         status = 'OVERENGINEERED';
         finding = {
           id: 'ARCH-MICRO-001',
@@ -277,7 +318,7 @@ function evaluateSingleConcept(conceptId, applicability, inventory, requirements
           status: 'WARNING',
           severity: 'medium',
           title: 'Microservices Architecture for Small Engineering Team',
-          explanation: `Detected ${inventory.counts.services} distributed backend services maintained by a small team (${requirements.teamSize}). Distributed operations increase cognitive and maintenance overhead.`,
+          explanation: `Detected ${inventory.counts.services} distributed backend services maintained by a small team (${requirements.teamSize}). Distributed operations increase cognitive and maintenance overhead without justified independent operational requirements.`,
           evidence: { serviceCount: inventory.counts.services },
           checkMethod: 'heuristic',
           recommendation: 'Consider consolidating services into a modular monolith with clear domain boundaries until team size warrants distributed deployment.',
@@ -385,6 +426,7 @@ function evaluateSingleConcept(conceptId, applicability, inventory, requirements
     // 8. Partitioning & Sharding
     // =========================================================================
     case 'partitioning_sharding': {
+      const isRecommended = applicability.level === APPLICABILITY_LEVELS.RECOMMENDED;
       return {
         conceptId,
         name: 'Database Partitioning & Sharding',
@@ -400,7 +442,7 @@ function evaluateSingleConcept(conceptId, applicability, inventory, requirements
         operationalOverhead: 'high',
         validationMethod: 'Verify partition pruning query plans using EXPLAIN ANALYZE.',
         notRecommendedConditions: ['99% of web applications with datasets < 1TB', 'Complex relational schemas requiring arbitrary multi-table joins'],
-        status: 'NOT_APPLICABLE',
+        status: isRecommended ? 'RECOMMENDED' : 'NOT_APPLICABLE',
         finding: null,
       };
     }

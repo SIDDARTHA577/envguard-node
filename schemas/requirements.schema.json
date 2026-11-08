@@ -1,0 +1,91 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "EnvGuard Architecture Requirements Schema",
+  "description": "Defines application architecture, availability, SLOs, workload assumptions, and operational constraints for EnvGuard readiness evaluations.",
+  "type": "object",
+  "required": ["schemaVersion", "applicationPurpose"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": {
+      "type": "string",
+      "enum": ["1.0.0"]
+    },
+    "applicationPurpose": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 500
+    },
+    "criticalUserJourneys": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "expectedTraffic": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["UNKNOWN", "PROVIDED", "ESTIMATED_FOR_PLANNING", "MEASURED_STAGING"]
+        },
+        "requestsPerSecondPeak": { "type": ["number", "null"], "minimum": 0 },
+        "requestsPerSecondAvg": { "type": ["number", "null"], "minimum": 0 },
+        "dailyActiveUsers": { "type": ["number", "null"], "minimum": 0 },
+        "mode": { "type": "string" }
+      }
+    },
+    "availabilityTarget": {
+      "type": "object",
+      "properties": {
+        "target": { "type": "string" },
+        "level": {
+          "type": "string",
+          "enum": ["standard_business", "high_availability", "mission_critical"]
+        },
+        "errorBudgetMinutesPerMonth": { "type": "number", "minimum": 0 }
+      }
+    },
+    "latencySLO": {
+      "type": "object",
+      "properties": {
+        "p50Ms": { "type": "number", "minimum": 0 },
+        "p95Ms": { "type": "number", "minimum": 0 },
+        "p99Ms": { "type": "number", "minimum": 0 }
+      }
+    },
+    "hostingConstraints": {
+      "type": "object",
+      "properties": {
+        "environment": { "type": "string" },
+        "budgetMonthlyUsd": { "type": ["number", "null"], "minimum": 0 },
+        "singleOrMultiRegion": { "type": "string", "enum": ["single-region", "multi-region", "global"] },
+        "primaryRegion": { "type": "string" }
+      }
+    },
+    "securityRequirements": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "dataSensitivity": {
+      "type": "string",
+      "enum": ["PUBLIC", "INTERNAL", "CONFIDENTIAL_PII", "RESTRICTED"]
+    },
+    "geographicDistribution": {
+      "type": "string",
+      "enum": ["single-region", "multi-region", "global"]
+    },
+    "budgetAssumptions": { "type": "string" },
+    "teamSize": { "type": "string" },
+    "maintenanceResponsibilities": { "type": "string" },
+    "recoveryObjectives": {
+      "type": "object",
+      "properties": {
+        "rpoMinutes": { "type": "number", "minimum": 0 },
+        "rtoMinutes": { "type": "number", "minimum": 0 }
+      }
+    },
+    "deploymentEnvironment": {
+      "type": "string",
+      "enum": ["development", "staging", "production"]
+    }
+  },
+  "additionalProperties": false
+}
