@@ -17,6 +17,15 @@ import { runProjectCommand, isEnvironmentIsolated } from '../execution/runner.mj
 import { evaluateReleasePolicy } from '../policies/release-policy.mjs';
 import { formatJsonReport } from '../reporters/json-reporter.mjs';
 import { generateMarkdownReport } from '../reporters/markdown-reporter.mjs';
+import {
+  buildArchitectureInventory,
+  discoverArchitectureRequirements,
+  evaluateSystemDesignDecisions,
+  evaluateArchitectureTradeoffs,
+  analyzeFailureModes,
+  buildCapacityModel,
+  generateArchitectureDecisionRecords,
+} from '../architecture/index.mjs';
 
 /**
  * Executes a full multi-platform application production readiness audit.
@@ -47,6 +56,8 @@ export function runReadinessAudit({
   sarifPath = null,
   outputDir = null,
   format = 'both',
+  includeArchitecture = true,
+  architectureRequirements = {},
 } = {}) {
   const safeProjectDir = assertSafeProjectDir(projectDir);
 
@@ -131,6 +142,40 @@ export function runReadinessAudit({
     }
   }
 
+  // 2c. Architecture & Senior System Design Assessment
+  let architecturePayload = null;
+  if (includeArchitecture) {
+    const archInventory = buildArchitectureInventory(safeProjectDir, inventory);
+    const archReqs = discoverArchitectureRequirements(safeProjectDir, architectureRequirements);
+    const { evaluations: archEvaluations, findings: archFindings } = evaluateSystemDesignDecisions(
+      safeProjectDir,
+      archInventory,
+      archReqs
+    );
+
+    for (const finding of archFindings) {
+      finding.toolName = finding.toolName || 'envguard-senior-architect';
+      finding.toolVersion = finding.toolVersion || TOOL_VERSION;
+      finding.adapterId = finding.adapterId || 'architecture';
+      allFindings.push(finding);
+    }
+
+    const tradeoffs = evaluateArchitectureTradeoffs(archInventory, archReqs);
+    const failureModes = analyzeFailureModes(archInventory, archReqs);
+    const capacityModel = buildCapacityModel(archInventory, archReqs);
+    const adrs = generateArchitectureDecisionRecords(archInventory, archReqs, archEvaluations);
+
+    architecturePayload = {
+      inventory: archInventory,
+      requirements: archReqs,
+      evaluations: archEvaluations,
+      tradeoffs,
+      failureModes,
+      capacityModel,
+      adrs,
+    };
+  }
+
   // 3. Filter findings by requested categories
   const filteredFindings = allFindings.filter((f) => categories.includes(f.category));
 
@@ -203,6 +248,7 @@ export function runReadinessAudit({
     policyEvaluation,
     findings: filteredFindings,
     limitations: Array.from(limitations),
+    architecture: architecturePayload || undefined,
   };
 
   // 8. Write reports if outputDir is specified

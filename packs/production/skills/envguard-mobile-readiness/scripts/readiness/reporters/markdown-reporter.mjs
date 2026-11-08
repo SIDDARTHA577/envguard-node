@@ -1,4 +1,5 @@
 import { escapeMarkdown } from '../constants.mjs';
+import { formatArchitectureMarkdown } from '../architecture/architecture-reporter.mjs';
 
 /**
  * Generates human-readable Markdown readiness report with all standardized sections.
@@ -123,6 +124,11 @@ export function generateMarkdownReport(report) {
     md += `- ${escapeMarkdown(lim)}\n`;
   }
   md += `\n`;
+
+  // 8. Architecture Review & ADRs
+  if (report.architecture) {
+    md += formatArchitectureMarkdown(report.architecture);
+  }
 
   return md;
 }

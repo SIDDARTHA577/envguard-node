@@ -420,6 +420,60 @@
         "Check our iOS codebase for App Transport Security compliance, Keychain usage, and Apple Privacy Manifest completeness"
       ]
     }
+  },
+  {
+    "name": "envguard-load-test",
+    "pack": "production",
+    "description": "Guides capacity planning, workload profile design, local performance benchmarking, and threshold validation without fabricating production metrics or executing unauthorized traffic.",
+    "canonicalDir": "packs/production/skills/envguard-load-test",
+    "version": "1.0.0",
+    "supportedHosts": ["codex", "antigravity", "claude-code", "cursor"],
+    "requiredTools": ["read_file", "write_file", "run_command"],
+    "requiredPermissions": ["read-only", "workspace-write"],
+    "triggers": {
+      "when": [
+        "Designing workload capacity models and performance SLOs for upcoming service launches",
+        "Running safe local HTTP performance benchmarks against localhost development servers",
+        "Generating synthetic stress profiles, threshold checks, and k6/autocannon load test plans"
+      ],
+      "whenNot": [
+        "Executing unauthorized load tests against production endpoints or external services",
+        "Auditing static code vulnerabilities or environment secret leakage",
+        "Designing database schemas or optimizing raw SQL query indexes in isolation"
+      ],
+      "suggestedPrompts": [
+        "Benchmark our local Express API endpoint at http://localhost:3000/healthz and check if p95 latency is under 200ms",
+        "Generate a capacity plan and k6 load testing script for a hypothetical 10,000-virtual-user workload",
+        "Evaluate our Fastify server throughput and measure response latency under 10 concurrent requests"
+      ]
+    }
+  },
+  {
+    "name": "envguard-senior-engineer-review",
+    "pack": "production",
+    "description": "Flagship senior software architect review coordinating full-stack discovery, system design assessment, multi-adapter verification, capacity planning, SRE reliability analysis, and ADR generation.",
+    "canonicalDir": "packs/production/skills/envguard-senior-engineer-review",
+    "version": "1.0.0",
+    "supportedHosts": ["codex", "antigravity", "claude-code", "cursor"],
+    "requiredTools": ["read_file", "write_file", "run_command"],
+    "requiredPermissions": ["read-only", "workspace-write"],
+    "triggers": {
+      "when": [
+        "Conducting a comprehensive architectural review of an application or monorepo before production deployment",
+        "Evaluating system design scalability, failure modes, and capacity requirements for expected traffic growth",
+        "Reviewing complete multi-tier systems across frontend, mobile, backend API, database, and cloud infrastructure"
+      ],
+      "whenNot": [
+        "Conducting quick single-file lint or type checks",
+        "Auditing environment variables exclusively for secret leakage",
+        "Writing raw database SQL migration scripts in isolation"
+      ],
+      "suggestedPrompts": [
+        "Review my complete application as a senior software architect before production deployment",
+        "Evaluate our full-stack architecture, identify scalability bottlenecks, and generate pre-deployment ADRs",
+        "Conduct an integrated senior engineering review of our monorepo (Expo mobile + Express API + PostgreSQL)"
+      ]
+    }
   }
 ]
 
