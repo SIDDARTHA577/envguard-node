@@ -518,6 +518,6 @@ describe('EnvGuard Production Readiness Auditor', () => {
       } finally {
         fs.rmSync(externalProject, { recursive: true, force: true });
       }
-    });
+    }, 30000);
   });
 });

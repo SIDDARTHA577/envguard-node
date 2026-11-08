@@ -1,0 +1,48 @@
+{
+  "$schema": "../schemas/requirements.schema.json",
+  "schemaVersion": "1.0.0",
+  "applicationPurpose": "Illustrative E-Commerce Order Processing API (Scenario Planning Only)",
+  "criticalUserJourneys": [
+    "User authentication and session verification",
+    "Cart checkout and payment gateway processing",
+    "Order confirmation notification dispatch"
+  ],
+  "expectedTraffic": {
+    "status": "ESTIMATED_FOR_PLANNING",
+    "requestsPerSecondPeak": 500,
+    "requestsPerSecondAvg": 150,
+    "dailyActiveUsers": 25000,
+    "mode": "synthetic_scenario"
+  },
+  "availabilityTarget": {
+    "target": "99.95%",
+    "level": "high_availability",
+    "errorBudgetMinutesPerMonth": 21.6
+  },
+  "latencySLO": {
+    "p50Ms": 40,
+    "p95Ms": 180,
+    "p99Ms": 400
+  },
+  "hostingConstraints": {
+    "environment": "container_paas",
+    "budgetMonthlyUsd": 250,
+    "singleOrMultiRegion": "single-region",
+    "primaryRegion": "us-east-1"
+  },
+  "securityRequirements": [
+    "OWASP Top 10 API Security standard compliance",
+    "TLS 1.3 enforced for all ingress traffic",
+    "Sensitive credentials stored in dedicated secrets vault"
+  ],
+  "dataSensitivity": "CONFIDENTIAL_PII",
+  "geographicDistribution": "single-region",
+  "budgetAssumptions": "Cost-conscious startup infrastructure",
+  "teamSize": "small (3-5 engineers)",
+  "maintenanceResponsibilities": "Single on-call engineering rotation",
+  "recoveryObjectives": {
+    "rpoMinutes": 60,
+    "rtoMinutes": 240
+  },
+  "deploymentEnvironment": "production"
+}

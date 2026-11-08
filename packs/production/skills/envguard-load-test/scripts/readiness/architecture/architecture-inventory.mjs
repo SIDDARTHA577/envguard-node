@@ -298,8 +298,19 @@ export function buildArchitectureInventory(projectDir, inventoryGraph) {
   if (hasFile('docker-compose.yml') || hasFile('compose.yaml') || hasFile('docker-compose.yaml')) {
     infraTech.push('docker-compose');
   }
-  if (files.some((f) => f.startsWith('k8s/') || f.startsWith('kubernetes/') || f.endsWith('.k8s.yaml'))) {
+  const k8sFiles = files.filter((f) => f.startsWith('k8s/') || f.startsWith('kubernetes/') || f.endsWith('.k8s.yaml') || f.endsWith('.k8s.yml'));
+  let k8sReplicaCount = null;
+  if (k8sFiles.length > 0) {
     infraTech.push('kubernetes');
+    for (const kf of k8sFiles) {
+      try {
+        const kfContent = fs.readFileSync(path.join(projectDir, kf), 'utf8');
+        const m = kfContent.match(/replicas:\s*(\d+)/);
+        if (m) {
+          k8sReplicaCount = parseInt(m[1], 10);
+        }
+      } catch {}
+    }
   }
   if (files.some((f) => f.endsWith('.tf') || f.endsWith('.tfvars'))) {
     infraTech.push('terraform');
@@ -310,6 +321,9 @@ export function buildArchitectureInventory(projectDir, inventoryGraph) {
   if (hasFile('Procfile')) {
     infraTech.push('procfile-paas');
   }
+  if (hasFile('fly.toml') || hasFile('render.yaml')) {
+    infraTech.push('managed-paas');
+  }
 
   if (infraTech.length > 0) {
     components.push({
@@ -318,6 +332,8 @@ export function buildArchitectureInventory(projectDir, inventoryGraph) {
       type: 'infrastructure',
       role: 'Packaging, Containerization & Orchestration Definitions',
       technologies: infraTech,
+      k8sReplicaCount,
+      hasSingleReplicaK8s: k8sReplicaCount === 1,
     });
     detectedTechnologies.add('infrastructure');
   }
