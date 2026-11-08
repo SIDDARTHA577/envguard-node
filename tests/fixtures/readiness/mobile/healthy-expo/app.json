@@ -1,0 +1,19 @@
+{
+  "expo": {
+    "name": "HealthyExpo",
+    "slug": "healthy-expo",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "healthyexpo",
+    "ios": {
+      "bundleIdentifier": "com.example.healthyexpo",
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.example.healthyexpo",
+      "adaptiveIcon": {
+        "backgroundColor": "#ffffff"
+      }
+    }
+  }
+}

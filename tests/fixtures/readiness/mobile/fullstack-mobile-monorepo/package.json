@@ -1,0 +1,8 @@
+{
+  "name": "fullstack-mobile-monorepo",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ]
+}

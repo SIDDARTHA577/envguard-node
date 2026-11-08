@@ -88,8 +88,7 @@ function resolveWorkspaceDirs(projectDir, globs) {
  */
 function classifyApplication(appDir, relPath, manifest) {
   const deps = { ...(manifest?.dependencies || {}), ...(manifest?.devDependencies || {}) };
-
-  // Detect frameworks
+  const languages = [];
   const frameworks = [];
   if (deps['next']) {
     frameworks.push('nextjs');
@@ -113,6 +112,40 @@ function classifyApplication(appDir, relPath, manifest) {
     frameworks.push('vite');
   }
 
+  // Detect mobile frameworks
+  const hasExpo = Boolean(deps['expo'] || fs.existsSync(path.join(appDir, 'app.json')) || fs.existsSync(path.join(appDir, 'eas.json')));
+  const hasReactNative = Boolean(deps['react-native'] || hasExpo);
+  if (hasExpo) frameworks.push('expo');
+  if (hasReactNative) frameworks.push('react-native');
+
+  // Detect Flutter
+  if (fs.existsSync(path.join(appDir, 'pubspec.yaml'))) {
+    languages.push('dart');
+    frameworks.push('flutter');
+  }
+
+  // Detect Android Native
+  const hasAndroidXml =
+    fs.existsSync(path.join(appDir, 'AndroidManifest.xml')) ||
+    fs.existsSync(path.join(appDir, 'src', 'main', 'AndroidManifest.xml'));
+  if (hasAndroidXml && !hasReactNative && !frameworks.includes('flutter')) {
+    if (!languages.includes('java')) languages.push('java');
+    if (!languages.includes('kotlin')) languages.push('kotlin');
+    frameworks.push('android-native');
+  }
+
+  // Detect iOS Native
+  let hasIosProj = fs.existsSync(path.join(appDir, 'Package.swift'));
+  if (!hasIosProj) {
+    try {
+      hasIosProj = fs.readdirSync(appDir).some((f) => f.endsWith('.xcodeproj') || f.endsWith('.xcworkspace'));
+    } catch {}
+  }
+  if (hasIosProj && !hasReactNative && !frameworks.includes('flutter')) {
+    if (!languages.includes('swift')) languages.push('swift');
+    frameworks.push('ios-native');
+  }
+
   // Detect databases
   const databases = [];
   if (deps['prisma'] || deps['@prisma/client']) databases.push('prisma');
@@ -124,7 +157,6 @@ function classifyApplication(appDir, relPath, manifest) {
   if (deps['sqlite3'] || deps['better-sqlite3']) databases.push('sqlite');
 
   // Detect languages
-  const languages = [];
   const hasTsConfig = fs.existsSync(path.join(appDir, 'tsconfig.json'));
   if (hasTsConfig || deps['typescript']) {
     languages.push('typescript');
@@ -232,8 +264,18 @@ function classifyApplication(appDir, relPath, manifest) {
   let confidence = 'verified';
   let uncertaintyReason = null;
 
+  const isMobile =
+    frameworks.includes('expo') ||
+    frameworks.includes('react-native') ||
+    frameworks.includes('flutter') ||
+    frameworks.includes('android-native') ||
+    frameworks.includes('ios-native');
+
   if (!manifest) {
-    if (languages.includes('python')) {
+    if (isMobile) {
+      type = 'mobile';
+      confidence = 'verified';
+    } else if (languages.includes('python')) {
       if (frameworks.includes('django') || frameworks.includes('fastapi') || frameworks.includes('flask')) {
         type = 'backend';
         confidence = 'verified';
@@ -254,6 +296,9 @@ function classifyApplication(appDir, relPath, manifest) {
       confidence = 'uncertain';
       uncertaintyReason = 'No package.json manifest found in application directory.';
     }
+  } else if (isMobile) {
+    type = 'mobile';
+    confidence = 'verified';
   } else if (frameworks.includes('nextjs')) {
     // Next.js with app/api or pages/api can be fullstack
     const hasApiRoutes =

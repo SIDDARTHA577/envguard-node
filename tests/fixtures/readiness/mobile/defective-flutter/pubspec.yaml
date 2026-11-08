@@ -1,0 +1,11 @@
+name: defective_flutter_app
+description: "A defective Flutter application."
+version: 1.0.0
+
+environment:
+  sdk: ">=2.10.0 <3.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  shared_preferences: ^2.2.0

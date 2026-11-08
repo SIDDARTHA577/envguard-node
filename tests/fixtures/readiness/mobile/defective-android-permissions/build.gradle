@@ -1,0 +1,30 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.example.defectiveandroid'
+    compileSdk 33
+
+    defaultConfig {
+        applicationId "com.example.defectiveandroid"
+        minSdk 21
+        targetSdk 28
+    }
+
+    signingConfigs {
+        release {
+            storeFile file("release.keystore")
+            storePassword "PlaintextKeystorePassword123"
+            keyAlias "releaseKey"
+            keyPassword "PlaintextKeyPassword123"
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+    }
+}

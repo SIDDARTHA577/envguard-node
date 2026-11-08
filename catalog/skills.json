@@ -393,6 +393,33 @@
         "Generate a complete production readiness report with authorized test execution using --allow-exec"
       ]
     }
+  },
+  {
+    "name": "envguard-mobile-readiness",
+    "pack": "production",
+    "description": "Guides comprehensive, evidence-based mobile application readiness assessments for React Native, Expo, Flutter, Native Android (Kotlin/Java), and Native iOS (Swift) aligned with OWASP MASVS v2.0 standards.",
+    "canonicalDir": "packs/production/skills/envguard-mobile-readiness",
+    "version": "1.0.0",
+    "supportedHosts": ["codex", "antigravity", "claude-code", "cursor"],
+    "requiredTools": ["read_file", "write_file", "run_command"],
+    "requiredPermissions": ["read-only", "workspace-write"],
+    "triggers": {
+      "when": [
+        "Auditing a mobile application (React Native, Expo, Flutter, Android, iOS) for release readiness",
+        "Evaluating mobile security posture against OWASP MASVS v2.0 standards",
+        "Assessing full-stack monorepos containing mobile clients, backend APIs, and shared libraries"
+      ],
+      "whenNot": [
+        "Auditing web-only applications or backend microservices with no mobile clients",
+        "Auditing pure database migrations or relational schema designs",
+        "Designing cloud system architectures before mobile code exists"
+      ],
+      "suggestedPrompts": [
+        "Audit our React Native Expo application for mobile production readiness and check for OWASP MASVS compliance",
+        "Perform an Android native readiness audit on our Gradle app and check for unprotected exported components",
+        "Check our iOS codebase for App Transport Security compliance, Keychain usage, and Apple Privacy Manifest completeness"
+      ]
+    }
   }
 ]
 

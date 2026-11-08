@@ -1,0 +1,19 @@
+{
+  "name": "healthy-expo-app",
+  "version": "1.0.0",
+  "main": "App.tsx",
+  "scripts": {
+    "start": "expo start",
+    "test": "jest"
+  },
+  "dependencies": {
+    "expo": "^51.0.0",
+    "react-native": "0.74.0",
+    "expo-secure-store": "~13.0.0",
+    "@react-native-community/netinfo": "^11.3.0"
+  },
+  "devDependencies": {
+    "@testing-library/react-native": "^12.5.0",
+    "jest": "^29.7.0"
+  }
+}

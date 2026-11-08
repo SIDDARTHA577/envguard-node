@@ -1,0 +1,9 @@
+{
+  "expo": {
+    "name": "MonorepoMobile",
+    "slug": "monorepo-mobile",
+    "version": "1.0.0",
+    "ios": { "bundleIdentifier": "com.monorepo.mobile" },
+    "android": { "package": "com.monorepo.mobile" }
+  }
+}

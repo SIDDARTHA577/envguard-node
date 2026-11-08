@@ -4,4 +4,8 @@ export { NodeTypeScriptAdapter } from './node-typescript-adapter.mjs';
 export { NextJsReactAdapter } from './nextjs-react-adapter.mjs';
 export { PythonAdapter } from './python-adapter.mjs';
 export { JavaSpringBootAdapter } from './java-spring-adapter.mjs';
+export { ReactNativeAdapter } from './react-native-adapter.mjs';
+export { FlutterAdapter } from './flutter-adapter.mjs';
+export { AndroidAdapter } from './android-adapter.mjs';
+export { IosAdapter } from './ios-adapter.mjs';
 export { AdapterRegistry, createDefaultRegistry } from './registry.mjs';

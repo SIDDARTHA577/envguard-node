@@ -21,8 +21,8 @@ Guides engineers and AI agents in conducting rigorous, evidence-based applicatio
 - Writing raw database migrations or tuning SQL indexes in isolation (use `envguard-database`).
 
 ## Supported Projects & Environments
-- Runtimes: Node.js (22.x, 24.x, 26.x), Bun, TypeScript, modern JavaScript (ESM / CommonJS), Python (3.10+), Java (17, 21, 25 LTS).
-- Web & Backend Frameworks: Express, Fastify, Next.js, NestJS, React, Vue, Svelte, Django, FastAPI, Flask, Spring Boot (Maven & Gradle).
+- Runtimes: Node.js (22.x, 24.x, 26.x), Bun, TypeScript, modern JavaScript (ESM / CommonJS), Python (3.10+), Java (17, 21, 25 LTS), Dart (3.x), Kotlin/Java (Android), Swift (iOS).
+- Web, Backend & Mobile Frameworks: Express, Fastify, Next.js, NestJS, React, Vue, Svelte, Django, FastAPI, Flask, Spring Boot (Maven & Gradle), React Native, Expo, Flutter, Android Native, iOS Native.
 - Container & Deployment Tech: Docker, Docker Compose, Kubernetes, Gunicorn, Uvicorn, GitHub Actions, GitLab CI.
 - Operating Systems: Linux (Ubuntu/Debian), macOS, Windows.
 
@@ -53,6 +53,30 @@ The Readiness Analyzer employs modular platform adapters that automatically reso
    - Versioned database migration frameworks (Flyway in `db/migration` or Liquibase in `db/changelog`).
    - SQL injection defenses (flags raw string concatenation in `createNativeQuery()` or `createQuery()`).
    - Automated JUnit 5 test suites.
+6. **React Native & Expo Adapter (`ReactNativeAdapter`)**: React Native and Expo mobile applications. Standardized OWASP MASVS v2.0 mapping:
+   - Hardware-backed key storage (`expo-secure-store` or `react-native-keychain` over unencrypted `AsyncStorage`).
+   - Deep link scheme validation (`prefixes` or custom schemes without wildcards).
+   - Origin-restricted WebView configurations (`originWhitelist` prohibiting `['*']`).
+   - Production log stripping (eliminates sensitive `console.log` in production bundles).
+   - React error boundaries, NetInfo network resilience, and AppState lifecycle listeners.
+7. **Flutter & Dart Adapter (`FlutterAdapter`)**: Flutter cross-platform applications:
+   - Sound null safety in Dart SDK constraints (`>=3.0.0 <4.0.0`) and locked dependencies (`pubspec.lock`).
+   - Secure token storage (`flutter_secure_storage` over cleartext `shared_preferences`).
+   - Static analysis linter rules (`analysis_options.yaml` with `flutter_lints`).
+   - Uncaught asynchronous error handlers (`runZonedGuarded` / `PlatformDispatcher.onError`).
+   - State controller resource disposal (`dispose()` on `TextEditingController`, `AnimationController`, `StreamController`).
+8. **Android Native Adapter (`AndroidAdapter`)**: Kotlin and Java Android native applications:
+   - App manifest security: `targetSdk >= 33`, `android:allowBackup="false"`, `android:usesCleartextTraffic="false"`, network security config.
+   - Unprotected exported components audit (verifies `android:exported="true"` has explicit `android:permission`).
+   - Encrypted token storage (`androidx.security:security-crypto` EncryptedSharedPreferences).
+   - Release signing security (verifies release keystore passwords are not committed in plaintext).
+   - Code obfuscation and shrinking (`minifyEnabled true` with `proguard-rules.pro`).
+9. **iOS & Apple Native Adapter (`IosAdapter`)**: Swift and Objective-C iOS applications:
+   - Minimum deployment target (`IPHONEOS_DEPLOYMENT_TARGET` / `Package.swift` platforms >= iOS 15.0).
+   - App Transport Security (ATS) enforcement (flags `NSAllowsArbitraryLoads = true`).
+   - iOS Keychain Services token storage (`SecItemAdd` / `SecItemCopyMatching` over cleartext `UserDefaults`).
+   - Apple Privacy Manifest compliance (`PrivacyInfo.xcprivacy` with declared tracking and required reason APIs).
+   - Objective, honest test evaluation: Marks native macOS `xcodebuild` as `NOT_RUN` on non-macOS runners with explicit prerequisite guidance.
 
 ## Required Tools & Permissions
 - Tools: File reader, file writer, command runner (`read_file`, `write_file`, `run_command`).
