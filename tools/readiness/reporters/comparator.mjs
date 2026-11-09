@@ -31,6 +31,8 @@ export function validateReportSchema(report, label = 'Report') {
   if (typeof report.summary !== 'object' || Array.isArray(report.summary)) {
     throw new Error(`Invalid comparison input: ${label} "summary" must be an object.`);
   }
+
+  return true;
 }
 
 /**

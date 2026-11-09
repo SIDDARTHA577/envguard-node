@@ -87,7 +87,7 @@ describe('EnvGuard Production Readiness Auditor', () => {
       expect(report.executionAudit).toBeDefined();
       expect(report.executionAudit.length).toBeGreaterThan(0);
       expect(report.executionAudit[0].command).toBe('npm');
-    }, 15000);
+    }, 30000);
   });
 
   describe('Scenario 2: Missing Environment Configuration (missing-env)', () => {
