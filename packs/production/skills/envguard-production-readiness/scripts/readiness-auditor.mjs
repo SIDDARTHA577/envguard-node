@@ -35,6 +35,11 @@ import {
   isPathIgnoredByRules,
   buildInventoryGraph,
   runReadinessAudit,
+  runOrchestratedPipeline,
+  WORKFLOW_STATES,
+  selectSkillsForProject,
+  SKILL_PRIORITIES,
+  formulateAssessmentPlan,
   BaseAdapter,
   GenericAdapter,
   NodeTypeScriptAdapter,
@@ -109,6 +114,11 @@ export {
   isPathIgnoredByRules,
   buildInventoryGraph,
   runReadinessAudit,
+  runOrchestratedPipeline,
+  WORKFLOW_STATES,
+  selectSkillsForProject,
+  SKILL_PRIORITIES,
+  formulateAssessmentPlan,
   BaseAdapter,
   GenericAdapter,
   NodeTypeScriptAdapter,
@@ -245,6 +255,7 @@ export function main(argv = process.argv.slice(2)) {
   let trustProject = false;
   let allowCrossProject = false;
   let previewCommands = false;
+  let orchestrate = false;
   let execCommands = null;
   let timeoutMs = 10000;
   let sarifPath = null;
@@ -270,6 +281,7 @@ Options:
   --allow-exec             Explicitly authorize local project build and test command execution (default: read-only)
   --trust-project          Explicitly acknowledge executing scripts on unisolated host without container containment
   --exec-commands <list>   Comma-separated list of allowed scripts to execute (e.g. "test,build")
+  --orchestrate            Run complete Senior Engineering Agent autonomous orchestration workflow
   --preview-commands       Preview planned commands and their network/filesystem effects without running them
   --compare <b.json> <a.json>  Compare before vs after readiness reports to verify remediation
   --sarif <file>           Path to SARIF report to import static analysis findings (CodeQL, ESLint, Trivy)
@@ -345,6 +357,8 @@ Safety Boundaries:
       trustProject = true;
     } else if (arg === '--preview-commands') {
       previewCommands = true;
+    } else if (arg === '--orchestrate') {
+      orchestrate = true;
     } else if (arg === '--allow-cross-project') {
       allowCrossProject = true;
     } else if (arg === '--sarif') {
@@ -487,6 +501,40 @@ Safety Boundaries:
     }
   }
 
+  // Handle autonomous orchestrator pipeline mode
+  if (orchestrate) {
+    let session;
+    try {
+      session = runOrchestratedPipeline({
+        projectDir: safeProjectDir,
+        categories,
+        allowExec,
+        trustProject,
+        timeoutMs,
+        sarifPath,
+        allowedCommands: execCommands,
+        outputDir: safeOutputDir,
+        format,
+        onStateTransition: (state) => {
+          console.log(`[ORCHESTRATOR] State transition: ${state}`);
+        },
+      });
+    } catch (err) {
+      console.error(`Orchestrator Error: ${err.message}`);
+      return EXIT_CODES.TOOL_ERROR;
+    }
+
+    if (session.state === WORKFLOW_STATES.FAILED) {
+      console.error(`Orchestrator pipeline failed: ${session.error}`);
+      return EXIT_CODES.TOOL_ERROR;
+    }
+
+    if (session.policyOutcome === 'BLOCKED') {
+      return EXIT_CODES.POLICY_BLOCKERS;
+    }
+    return EXIT_CODES.SUCCESS_NO_BLOCKERS;
+  }
+
   let report;
   try {
     report = runReadinessAudit({
@@ -553,6 +601,8 @@ Safety Boundaries:
 
   return EXIT_CODES.SUCCESS_NO_BLOCKERS;
 }
+
+export { main as runAuditorCli };
 
 // Direct invocation CLI runner
 const isDirectCall =

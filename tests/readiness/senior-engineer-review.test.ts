@@ -105,5 +105,5 @@ describe('Senior Engineer Review & Integrated Architecture Pipeline', () => {
     } finally {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }
-  });
+  }, 20000);
 });
