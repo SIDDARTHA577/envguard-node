@@ -8,3 +8,4 @@ export * from './reporters/index.mjs';
 export * from './architecture/index.mjs';
 export * from './capacity/benchmark-runner.mjs';
 export * from './remediation/index.mjs';
+export * from './deployment/index.mjs';

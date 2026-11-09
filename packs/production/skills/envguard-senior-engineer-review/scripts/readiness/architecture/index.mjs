@@ -15,6 +15,8 @@ export {
   buildCapacityModel,
   generate10kVirtualUserScenario,
   CAPACITY_RESULT_CATEGORIES,
+  WORKLOAD_CLASSIFICATIONS,
+  classifyWorkload,
   validateCapacityInputs,
 } from './capacity-model.mjs';
 export { generateArchitectureDecisionRecords, formatArchitectureMarkdown } from './architecture-reporter.mjs';

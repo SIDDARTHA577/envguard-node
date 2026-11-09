@@ -92,6 +92,13 @@ import {
   restoreCheckpoint,
   REMEDIATION_STATUSES,
   executeRemediationWorkflow,
+  validateContainerSetup,
+  validateKubernetesManifests,
+  validateCicdDeploymentGates,
+  validateOperationalReliability,
+  evaluateDeploymentGate,
+  DEPLOYMENT_GATE_VERDICTS,
+  DEPLOYMENT_EXECUTION_GUARD,
 } from './readiness/index.mjs';
 
 export {
@@ -178,6 +185,13 @@ export {
   restoreCheckpoint,
   REMEDIATION_STATUSES,
   executeRemediationWorkflow,
+  validateContainerSetup,
+  validateKubernetesManifests,
+  validateCicdDeploymentGates,
+  validateOperationalReliability,
+  evaluateDeploymentGate,
+  DEPLOYMENT_GATE_VERDICTS,
+  DEPLOYMENT_EXECUTION_GUARD,
 };
 
 // Backward-compatible individual check wrappers
@@ -240,6 +254,10 @@ export function checkDeploymentReadiness(projectDir, files) {
     ...generic.runStaticChecks(target, context).filter((f) => f.category === 'deployment' && f.id === 'DEP-001'),
     ...nodeAdapter.runStaticChecks(target, context).filter((f) => f.category === 'deployment'),
     ...generic.runStaticChecks(target, context).filter((f) => f.category === 'deployment' && f.id === 'DEP-004'),
+    ...validateContainerSetup(projectDir, files),
+    ...validateKubernetesManifests(projectDir, files),
+    ...validateCicdDeploymentGates(projectDir, files),
+    ...validateOperationalReliability(projectDir, files),
   ];
 }
 
@@ -272,6 +290,7 @@ export function main(argv = process.argv.slice(2)) {
   let orchestrate = false;
   let remediate = false;
   let applyFix = false;
+  let deploymentGate = false;
   let execCommands = null;
   let timeoutMs = 10000;
   let sarifPath = null;
@@ -300,6 +319,7 @@ Options:
   --orchestrate            Run complete Senior Engineering Agent autonomous orchestration workflow
   --remediate              Formulate reviewable remediation patches and unified diffs without modifying files
   --apply-fix              Apply approved remediation patches with automated rollback checkpoints and retesting
+  --deployment-gate        Evaluate comprehensive deployment readiness gate across containers, k8s, and reliability
   --preview-commands       Preview planned commands and their network/filesystem effects without running them
   --compare <b.json> <a.json>  Compare before vs after readiness reports to verify remediation
   --sarif <file>           Path to SARIF report to import static analysis findings (CodeQL, ESLint, Trivy)
@@ -382,6 +402,8 @@ Safety Boundaries:
     } else if (arg === '--apply-fix') {
       applyFix = true;
       remediate = true;
+    } else if (arg === '--deployment-gate') {
+      deploymentGate = true;
     } else if (arg === '--allow-cross-project') {
       allowCrossProject = true;
     } else if (arg === '--sarif') {
@@ -657,6 +679,33 @@ Safety Boundaries:
       console.log(jsonOutput);
     } else {
       console.log(mdOutput);
+    }
+  }
+
+  if (deploymentGate) {
+    const deploymentFindings = checkDeploymentReadiness(safeProjectDir, collectProjectFiles(safeProjectDir));
+    const gateResult = evaluateDeploymentGate({
+      deploymentFindings,
+      policyFindings: report.findings,
+    });
+    console.log('\n=== EnvGuard Deployment Readiness Gate ===');
+    console.log(`Verdict: ${gateResult.verdict}`);
+    console.log(`Deployable: ${gateResult.deployable ? 'YES (requires separate manual execution)' : 'NO'}`);
+    console.log(`Auto-deploy policy: ${gateResult.executionGuard.policy}`);
+    if (gateResult.blockers.length > 0) {
+      console.log(`\nBlockers (${gateResult.blockers.length}):`);
+      for (const b of gateResult.blockers) {
+        console.log(`  - [${b.id}] ${b.title}`);
+      }
+    }
+    if (gateResult.missingPrerequisites.length > 0) {
+      console.log(`\nMissing Prerequisites (${gateResult.missingPrerequisites.length}):`);
+      for (const p of gateResult.missingPrerequisites) {
+        console.log(`  - [${p.id}] ${p.title}: ${p.impact}`);
+      }
+    }
+    if (gateResult.verdict === DEPLOYMENT_GATE_VERDICTS.BLOCKED) {
+      return EXIT_CODES.POLICY_BLOCKERS;
     }
   }
 

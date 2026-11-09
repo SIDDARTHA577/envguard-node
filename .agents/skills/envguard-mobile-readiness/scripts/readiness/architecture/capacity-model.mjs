@@ -11,6 +11,65 @@ export const CAPACITY_RESULT_CATEGORIES = {
   VERIFIED_CAPACITY_MODEL: 'VERIFIED_CAPACITY_MODEL',
 };
 
+export const WORKLOAD_CLASSIFICATIONS = {
+  ESTIMATED: 'ESTIMATED',
+  SIMULATED: 'SIMULATED',
+  MEASURED: 'MEASURED',
+  VERIFIED_STAGING: 'VERIFIED_STAGING',
+  UNKNOWN_PRODUCTION: 'UNKNOWN_PRODUCTION',
+};
+
+/**
+ * Classifies workload with explicit provenance and evidence boundaries.
+ * Strictly prevents treating unmeasured assumptions or synthetic curves as verified capacity.
+ *
+ * @param {object} params
+ * @param {object} [params.requirements] - Requirements profile
+ * @param {object} [params.benchmark] - Measured benchmark result
+ * @param {object} [params.stagingTelemetry] - Staging telemetry result
+ * @returns {object} Workload classification metadata
+ */
+export function classifyWorkload({ requirements = null, benchmark = null, stagingTelemetry = null } = {}) {
+  if (stagingTelemetry && stagingTelemetry.verified) {
+    return {
+      classification: WORKLOAD_CLASSIFICATIONS.VERIFIED_STAGING,
+      description: 'Verified staging environment outcome with authorized telemetry evidence.',
+      confidence: 'verified_fact',
+      authorized: true,
+    };
+  }
+  if (benchmark && (benchmark.samplesCount > 0 || benchmark.totalRequests > 0)) {
+    return {
+      classification: WORKLOAD_CLASSIFICATIONS.MEASURED,
+      description: 'Empirically measured local benchmark executed against approved loopback target.',
+      confidence: 'measured_evidence',
+      authorized: true,
+    };
+  }
+  if (requirements?.traffic?.status === 'CONFIRMED') {
+    return {
+      classification: WORKLOAD_CLASSIFICATIONS.ESTIMATED,
+      description: 'Theoretical workload estimated from confirmed application requirements.',
+      confidence: 'engineering_estimate',
+      authorized: false,
+    };
+  }
+  if (requirements?.traffic?.status === 'ASSUMED' || requirements?.traffic?.isHypothetical) {
+    return {
+      classification: WORKLOAD_CLASSIFICATIONS.SIMULATED,
+      description: 'Synthetic scenario model based on heuristic planning assumptions.',
+      confidence: 'hypothetical_simulation',
+      authorized: false,
+    };
+  }
+  return {
+    classification: WORKLOAD_CLASSIFICATIONS.UNKNOWN_PRODUCTION,
+    description: 'Unknown production capacity; no empirical measurements or confirmed requirements available.',
+    confidence: 'unknown',
+    authorized: false,
+  };
+}
+
 /**
  * Validates capacity input parameters, strictly rejecting invalid or unphysical numbers.
  *
@@ -109,8 +168,15 @@ export function buildCapacityModel(inventory, requirements, options = {}) {
     '5. Apply the empirical instance throughput into the verified capacity formula: replicas = ceil((peakRps / instanceThroughput) * 1.4 headroom).',
   ];
 
+  const workloadClassification = classifyWorkload({
+    requirements,
+    benchmark: measuredBenchmark,
+    stagingTelemetry: options.stagingTelemetry || null,
+  });
+
   return {
     category,
+    workloadClassification,
     workloadState: isWorkloadProvided ? 'USER_PROVIDED' : 'HYPOTHETICAL_SCENARIO_ONLY',
     isVerifiedModel: category === CAPACITY_RESULT_CATEGORIES.VERIFIED_CAPACITY_MODEL,
     observedMetrics: {
