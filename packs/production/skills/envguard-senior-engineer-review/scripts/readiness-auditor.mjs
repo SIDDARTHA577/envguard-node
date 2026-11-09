@@ -24,6 +24,9 @@ import {
   collectProjectFiles,
   parseYamlFallback,
   isEnvironmentIsolated,
+  detectContainerEnvironment,
+  TRUST_MODELS,
+  validateWorkingDirectory,
   buildSanitizedEnv,
   runProjectCommand,
   previewExecutionCommands,
@@ -46,9 +49,15 @@ import {
   createDefaultRegistry,
   evaluateReleasePolicy,
   POLICY_OUTCOMES,
+  DEFAULT_MANDATORY_CHECKS,
+  DEFAULT_BLOCKING_CATEGORIES,
+  DEFAULT_BLOCKING_SEVERITIES,
+  checkWaiver,
   formatJsonReport,
   generateMarkdownReport,
   generateProfessionalEngineeringReport,
+  validateReportSchema,
+  getFindingKey,
   compareReadinessReports,
   formatComparisonMarkdown,
   buildArchitectureInventory,
@@ -89,6 +98,9 @@ export {
   collectProjectFiles,
   parseYamlFallback,
   isEnvironmentIsolated,
+  detectContainerEnvironment,
+  TRUST_MODELS,
+  validateWorkingDirectory,
   buildSanitizedEnv,
   runProjectCommand,
   previewExecutionCommands,
@@ -111,9 +123,15 @@ export {
   createDefaultRegistry,
   evaluateReleasePolicy,
   POLICY_OUTCOMES,
+  DEFAULT_MANDATORY_CHECKS,
+  DEFAULT_BLOCKING_CATEGORIES,
+  DEFAULT_BLOCKING_SEVERITIES,
+  checkWaiver,
   formatJsonReport,
   generateMarkdownReport,
   generateProfessionalEngineeringReport,
+  validateReportSchema,
+  getFindingKey,
   compareReadinessReports,
   formatComparisonMarkdown,
   buildArchitectureInventory,
@@ -225,6 +243,7 @@ export function main(argv = process.argv.slice(2)) {
   let categories = [...VALID_CATEGORIES];
   let allowExec = false;
   let trustProject = false;
+  let allowCrossProject = false;
   let previewCommands = false;
   let execCommands = null;
   let timeoutMs = 10000;
@@ -326,6 +345,8 @@ Safety Boundaries:
       trustProject = true;
     } else if (arg === '--preview-commands') {
       previewCommands = true;
+    } else if (arg === '--allow-cross-project') {
+      allowCrossProject = true;
     } else if (arg === '--sarif') {
       const val = argv[++i];
       if (!val || val.startsWith('--')) {
@@ -376,7 +397,7 @@ Safety Boundaries:
 
     let comparison;
     try {
-      comparison = compareReadinessReports(beforeJson, afterJson);
+      comparison = compareReadinessReports(beforeJson, afterJson, { allowCrossProject });
     } catch (err) {
       console.error(`Error comparing readiness reports: ${err.message}`);
       return EXIT_CODES.TOOL_ERROR;

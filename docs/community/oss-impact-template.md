@@ -50,8 +50,8 @@ To maintain strict open-source integrity, all entries in this evidence ledger mu
 
 ### B. Developer Skills & Multi-Platform Readiness (Layer B)
 - **Status**: `[VERIFIED FACT]`
-- **Catalog Size**: 16 canonical skills in `catalog/skills.json` across 3 packs (`core`, `fullstack`, `production`).
-- **Supported Platform Adapters**: 9 built-in adapters (`generic`, `node-typescript`, `nextjs-react`, `python`, `java-spring`, `react-native`, `flutter`, `android`, `ios`).
+- **Catalog Size**: 18 canonical skills in `catalog/skills.json` across 3 packs (`core`, `fullstack`, `production`).
+- **Supported Platform Adapters**: 10 built-in adapters (`generic`, `node-typescript`, `nextjs-react`, `python`, `java-spring`, `react-native`, `flutter`, `android`, `ios`, `architecture`).
 - **Verification Command**:
   ```bash
   npm run skills:verify
@@ -72,14 +72,18 @@ To maintain strict open-source integrity, all entries in this evidence ledger mu
 | **Phase 3.1 & 3.2** | #10 | `...` | Adapter architecture & test runner isolation | `[VERIFIED FACT]` |
 | **Phase 4.1.1** | #13 | `8da75c7...` | Verification accuracy hardening (SARIF, SQL, index prefix) | `[VERIFIED FACT]` |
 | **Phase 4.2** | #14 | `87c6374...` | Multi-language backend adapters (Python, Java/Spring Boot) | `[VERIFIED FACT]` |
-| **Phase 5** | Pending | Branch `feat/envguard-mobile-readiness` | Universal mobile application readiness (RN, Flutter, Android, iOS) | `[PENDING VERIFICATION]` |
+| **Phase 5** | #15 | `023e387...` | Universal mobile application readiness (RN, Flutter, Android, iOS) | `[VERIFIED FACT]` |
+| **Phase 6** | #16 | `64a4c28...` | Senior engineering & system architecture review (ADR, FMEA, capacity) | `[VERIFIED FACT]` |
+| **Phase 7** | #17 | `b96bf1b...` | Engineering accuracy, requirements provenance, capacity modeling | `[VERIFIED FACT]` |
+| **Phase 8** | #18 | `5c203c4...` | Real-world developer validation, multi-host agents, 10 archetypes | `[VERIFIED FACT]` |
+| **Phase 9** | #19 | Pending (`fix/envguard-final-trust-hardening`) | Execution trust boundaries, comparator accuracy, hardened release gates | `[PENDING VERIFICATION]` |
 
 ---
 
 ## 5. Community & External Ecosystem Metrics
 
 ### A. Maintainer vs External Contributions
-- **Total Maintainer Merged PRs**: 9 PRs (Phases 0 through 4.2).
+- **Total Maintainer Merged PRs**: 13 PRs (Phases 0 through 8).
 - **External Community Contributors**: 0 `[VERIFIED FACT]`.
   - *Policy*: Do not list maintainer commits as external contributions.
   - *Next Milestone*: Establish clear `CONTRIBUTING.md` guidelines and good-first-issues to invite external peer review.
