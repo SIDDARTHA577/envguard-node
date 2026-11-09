@@ -132,16 +132,33 @@ describe('Phase 8 — Real-World Developer Product Validation & Public Release R
   // =========================================================================
   describe('8.3 & 8.6: Golden-Path Developer Workflow & Report Comparison', () => {
     it('compares before vs after reports and correctly tracks resolved findings', () => {
+      const disposableDir = path.join(tempDir, 'disposable-workflow-app');
+      fs.cpSync(path.join(fixturesDir, 'missing-env'), disposableDir, { recursive: true });
+
       const beforeReport = runReadinessAudit({
-        projectDir: path.join(fixturesDir, 'missing-env'),
+        projectDir: disposableDir,
       });
+
+      // Remediate missing env.example and missing gitignore in the same application
+      fs.writeFileSync(
+        path.join(disposableDir, '.env.example'),
+        'PORT=3000\nDATABASE_URL=postgres://localhost:5432/db\nAPI_KEY=your_key_here\n'
+      );
+      fs.writeFileSync(
+        path.join(disposableDir, '.gitignore'),
+        '.env\n.env.*\nnode_modules\n'
+      );
+
       const afterReport = runReadinessAudit({
-        projectDir: path.join(fixturesDir, 'healthy-app'),
+        projectDir: disposableDir,
+        allowExec: true,
+        trustProject: true,
       });
 
       const comparison = compareReadinessReports(beforeReport, afterReport);
 
       expect(comparison).toBeDefined();
+      expect(comparison.projectIdentity.projectMismatch).toBe(false);
       expect(comparison.statusTransition.from).toBe('BLOCKED');
       expect(comparison.statusTransition.to).not.toBe('BLOCKED');
       expect(comparison.statusTransition.improved).toBe(true);
@@ -166,11 +183,18 @@ describe('Phase 8 — Real-World Developer Product Validation & Public Release R
     });
 
     it('detects regressions when a previously passing check fails in follow-up assessment', () => {
+      const disposableDir = path.join(tempDir, 'disposable-regression-app');
+      fs.cpSync(path.join(fixturesDir, 'healthy-app'), disposableDir, { recursive: true });
+
       const beforeReport = runReadinessAudit({
-        projectDir: path.join(fixturesDir, 'healthy-app'),
+        projectDir: disposableDir,
       });
+
+      // Introduce a regression by removing .env.example
+      fs.rmSync(path.join(disposableDir, '.env.example'), { force: true });
+
       const afterReport = runReadinessAudit({
-        projectDir: path.join(fixturesDir, 'missing-env'),
+        projectDir: disposableDir,
       });
 
       const comparison = compareReadinessReports(beforeReport, afterReport);
@@ -185,11 +209,27 @@ describe('Phase 8 — Real-World Developer Product Validation & Public Release R
     });
 
     it('executes CLI with --compare and emits comparison reports', () => {
+      const disposableDir = path.join(tempDir, 'disposable-cli-compare-app');
+      fs.cpSync(path.join(fixturesDir, 'missing-env'), disposableDir, { recursive: true });
+
       const beforeReport = runReadinessAudit({
-        projectDir: path.join(fixturesDir, 'missing-env'),
+        projectDir: disposableDir,
       });
+
+      // Remediate
+      fs.writeFileSync(
+        path.join(disposableDir, '.env.example'),
+        'PORT=3000\nDATABASE_URL=postgres://localhost:5432/db\nAPI_KEY=your_key_here\n'
+      );
+      fs.writeFileSync(
+        path.join(disposableDir, '.gitignore'),
+        '.env\n.env.*\nnode_modules\n'
+      );
+
       const afterReport = runReadinessAudit({
-        projectDir: path.join(fixturesDir, 'healthy-app'),
+        projectDir: disposableDir,
+        allowExec: true,
+        trustProject: true,
       });
 
       const beforePath = path.join(tempDir, 'before.json');
