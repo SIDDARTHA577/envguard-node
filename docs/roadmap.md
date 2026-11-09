@@ -19,13 +19,13 @@ This roadmap reflects genuine engineering priorities and planned capabilities ba
 
 ---
 
-## Active Roadmap (Phases 10 – 14 — Strict Pre-Release Development Mode) :hammer_and_wrench:
+## Completed Engineering Milestones (Phases 10 – 14) :white_check_mark:
 
-- [ ] **Phase 10 — Complete Senior Engineering Agent Orchestration**: Autonomous multi-stage evaluation pipeline coordinating discovery, planning, skill selection, and unified assessment.
-- [ ] **Phase 11 — Reviewable Fixes & Automated Retesting Workflow**: Non-destructive remediation patches with diff previews, mandatory human approval gates, and automatic retesting.
-- [ ] **Phase 12 — Real Deployment, Scalability & Reliability Validation**: Empirical deployment readiness checklists, failure-mode stress tests, and automated k6/autocannon local benchmark integration.
-- [ ] **Phase 13 — Independent Developer & Agent Testing**: Verification against 10 real-world project archetypes and multi-host AI agent environments.
-- [ ] **Phase 14 — Final Platform Stabilization**: Zero-dependency boundary audit, comprehensive documentation synchronization, and release-ready maintainer review.
+- [x] **Phase 10 — Complete Senior Engineering Agent Orchestration**: Autonomous multi-stage evaluation pipeline coordinating discovery, planning, dynamic 18-skill selection, and session artifact emission. (Completed — PR #20)
+- [x] **Phase 11 — Reviewable Fixes & Automated Retesting Workflow**: Non-destructive remediation patches (`ENV-001`, `ENV-002`, `BUILD-001`) with unified diff previews, atomic rollback checkpoints, mandatory human approval gates, and automatic retesting. (Completed — PR #21)
+- [x] **Phase 12 — Real Deployment, Scalability & Reliability Validation**: Empirical deployment readiness checklists (unprivileged containers, health probes, k8s manifests, CI/CD gates), workload classification (`ESTIMATED`, `SIMULATED`, `MEASURED`, `VERIFIED_STAGING`, `UNKNOWN_PRODUCTION`), and strict no-auto-deploy enforcement. (Completed — PR #22)
+- [x] **Phase 13 — Independent Developer & Agent Testing**: Verification across 12 distinct project archetypes and 4 agent host directory structures (`.agents`, `.claude`, `.cursor`, `skills/`) with honest adoption disclosures. (Completed — PR #23)
+- [x] **Phase 14 — Final Platform Stabilization**: Zero-dependency boundary audit, comprehensive documentation synchronization, and release-ready maintainer review package. (Completed — PR #24)
 
 ---
 

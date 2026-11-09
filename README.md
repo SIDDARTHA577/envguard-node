@@ -135,15 +135,25 @@ node tools/skill-manager.mjs install --pack core --dest /path/to/project --targe
 Audit any backend, web, mobile, or monorepo project against 12 engineering domains:
 
 ```bash
-# Golden-Path 3-Step Workflow:
-
 # 1. Audit: Scan project in read-only mode by default
 node tools/readiness-auditor.mjs scan --project . --output-dir ./reports --format both
 
-# 2. Preview Execution: Review planned test/build commands before authorizing
+# 2. Autonomous Agent Orchestration: Multi-stage evaluation across discovery, planning, and all 18 skills
+node tools/readiness-auditor.mjs --orchestrate --project . --output-dir ./reports
+
+# 3. Preview Execution: Review planned test/build commands before authorizing
 node tools/readiness-auditor.mjs scan --project . --preview-commands
 
-# 3. Verify & Remediate: Compare baseline report against remediated report
+# 4. Reviewable Remediation: Formulate safe non-destructive patches with unified diffs (dry-run)
+node tools/readiness-auditor.mjs --remediate --project .
+
+# 5. Apply Fix & Retest: Create atomic rollback checkpoint, apply approved patches, and verify
+node tools/readiness-auditor.mjs --apply-fix --project .
+
+# 6. Deployment Readiness Gate: Evaluate containers, k8s, CI/CD, and reliability (strict no-auto-deploy)
+node tools/readiness-auditor.mjs --deployment-gate --project .
+
+# 7. Verify & Compare: Compare baseline report against remediated report to confirm zero regressions
 node tools/readiness-auditor.mjs --compare reports/before.json reports/after.json --output-dir ./reports
 ```
 
@@ -252,17 +262,39 @@ Runnable examples are provided in [`examples/`](./examples/):
 
 ---
 
-## 9. AI Coding Agent Skills
+## 9. AI Coding Agent Skills Catalog (18 Skills)
 
-EnvGuard provides installable skills for AI coding agents (**Google Antigravity**, **Claude Code**, and **OpenAI Codex**):
+EnvGuard provides 18 installable agent skills across 3 curated packs for **Google Antigravity**, **Claude Code**, **Cursor IDE**, and **OpenAI Codex**:
 
+### Core Pack (`core`) — 5 Skills
 | Skill | Purpose |
 |---|---|
-| `envguard-audit` | Scans codebase for `process.env` references and proposes a schema without reading secrets. |
-| `envguard-setup` | Automates EnvGuard installation and entrypoint integration tailored to the project's package manager. |
+| `envguard-audit` | Scans codebase for `process.env` references and proposes a type-safe schema without reading secrets. |
+| `envguard-setup` | Automates EnvGuard installation, configuration, and entrypoint integration tailored to the project. |
 | `envguard-review` | Inspects environment handling for common security vulnerabilities and unmasked error logging. |
-| `envguard-ci` | Integrates validation into GitHub Actions or Docker entrypoints. |
+| `envguard-ci` | Integrates validation into CI/CD pipelines (GitHub Actions, GitLab CI, Docker entrypoints). |
 | `envguard-migrate` | Migrates legacy ad-hoc `process.env` reads to EnvGuard step-by-step with zero regressions. |
+
+### Full-Stack Architecture Pack (`fullstack`) — 9 Skills
+| Skill | Purpose |
+|---|---|
+| `envguard-system-design` | Architectural evaluation across 17 design concepts, non-functional requirements, and ADR generation. |
+| `envguard-backend` | Guides design and testing of secure, production-grade Node.js and TypeScript backend APIs. |
+| `envguard-database` | Schema design, composite indexing, expand/contract migrations, and connection pool optimization. |
+| `envguard-frontend` | Responsive component development with React/TypeScript, form validation, and state isolation. |
+| `envguard-fullstack-integration` | End-to-end integration across React frontends, Node APIs, shared contracts, and CORS boundaries. |
+| `envguard-ui-design` | Design tokens, standardized typography, spacing scales, responsive layout grids, and component anatomy. |
+| `envguard-api-design` | RESTful APIs with OpenAPI 3.1 contracts, RFC 9457 Problem Details, pagination, and backward compatibility. |
+| `envguard-code-review` | Rigorous evidence-based code reviews evaluating correctness, edge cases, performance, and breaking changes. |
+| `envguard-accessibility` | WCAG 2.1/2.2 AA audits, semantic HTML, keyboard navigation, focus traps, and color contrast. |
+
+### Production Readiness & SRE Pack (`production`) — 4 Skills
+| Skill | Purpose |
+|---|---|
+| `envguard-production-readiness` | Comprehensive 12-domain production readiness assessment across build, security, APIs, database, and reliability. |
+| `envguard-mobile-readiness` | Mobile app readiness for React Native, Expo, Flutter, Android (Kotlin), and iOS (Swift) aligned with OWASP MASVS v2.0. |
+| `envguard-senior-engineer-review` | Flagship architect review coordinating full-stack discovery, multi-adapter analysis, capacity planning, and ADRs. |
+| `envguard-load-test` | Capacity planning, transparent 10k-VU workload scenario modeling, and safe local HTTP benchmarking. |
 
 See [`docs/agent-installation.md`](./docs/agent-installation.md) for installation and usage instructions across each host.
 
