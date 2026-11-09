@@ -85,6 +85,13 @@ import {
   generateArchitectureDecisionRecords,
   formatArchitectureMarkdown,
   runLocalBenchmark,
+  generateUnifiedDiff,
+  discoverEnvVarNames,
+  generateRemediationPatches,
+  createCheckpoint,
+  restoreCheckpoint,
+  REMEDIATION_STATUSES,
+  executeRemediationWorkflow,
 } from './readiness/index.mjs';
 
 export {
@@ -164,6 +171,13 @@ export {
   generateArchitectureDecisionRecords,
   formatArchitectureMarkdown,
   runLocalBenchmark,
+  generateUnifiedDiff,
+  discoverEnvVarNames,
+  generateRemediationPatches,
+  createCheckpoint,
+  restoreCheckpoint,
+  REMEDIATION_STATUSES,
+  executeRemediationWorkflow,
 };
 
 // Backward-compatible individual check wrappers
@@ -256,6 +270,8 @@ export function main(argv = process.argv.slice(2)) {
   let allowCrossProject = false;
   let previewCommands = false;
   let orchestrate = false;
+  let remediate = false;
+  let applyFix = false;
   let execCommands = null;
   let timeoutMs = 10000;
   let sarifPath = null;
@@ -282,6 +298,8 @@ Options:
   --trust-project          Explicitly acknowledge executing scripts on unisolated host without container containment
   --exec-commands <list>   Comma-separated list of allowed scripts to execute (e.g. "test,build")
   --orchestrate            Run complete Senior Engineering Agent autonomous orchestration workflow
+  --remediate              Formulate reviewable remediation patches and unified diffs without modifying files
+  --apply-fix              Apply approved remediation patches with automated rollback checkpoints and retesting
   --preview-commands       Preview planned commands and their network/filesystem effects without running them
   --compare <b.json> <a.json>  Compare before vs after readiness reports to verify remediation
   --sarif <file>           Path to SARIF report to import static analysis findings (CodeQL, ESLint, Trivy)
@@ -359,6 +377,11 @@ Safety Boundaries:
       previewCommands = true;
     } else if (arg === '--orchestrate') {
       orchestrate = true;
+    } else if (arg === '--remediate') {
+      remediate = true;
+    } else if (arg === '--apply-fix') {
+      applyFix = true;
+      remediate = true;
     } else if (arg === '--allow-cross-project') {
       allowCrossProject = true;
     } else if (arg === '--sarif') {
@@ -533,6 +556,59 @@ Safety Boundaries:
       return EXIT_CODES.POLICY_BLOCKERS;
     }
     return EXIT_CODES.SUCCESS_NO_BLOCKERS;
+  }
+
+  // Handle remediation workflow mode
+  if (remediate) {
+    let remResult;
+    try {
+      remResult = executeRemediationWorkflow({
+        projectDir: safeProjectDir,
+        applyFix,
+        categories,
+        allowExec,
+        trustProject,
+        timeoutMs,
+      });
+    } catch (err) {
+      console.error(`Remediation Error: ${err.message}`);
+      return EXIT_CODES.TOOL_ERROR;
+    }
+
+    if (remResult.status === REMEDIATION_STATUSES.NO_ACTIONABLE_PATCHES) {
+      console.log('No actionable remediation patches available for current findings.');
+      return EXIT_CODES.SUCCESS_NO_BLOCKERS;
+    }
+
+    if (remResult.status === REMEDIATION_STATUSES.PROPOSED_PENDING_APPROVAL) {
+      console.log('\n=== Proposed EnvGuard Reviewable Remediation Patches ===');
+      console.log(remResult.diffPreview);
+      console.log(
+        `\nFormulated ${remResult.summary.totalPatches} patches (${remResult.summary.filesToCreate} new, ${remResult.summary.filesToModify} modified).`
+      );
+      console.log('Pass "--apply-fix" to apply patches with automated rollback checkpoint and retesting.\n');
+      return EXIT_CODES.SUCCESS_NO_BLOCKERS;
+    }
+
+    if (remResult.status === REMEDIATION_STATUSES.REVERTED_DUE_TO_REGRESSION) {
+      console.error(`Remediation reverted: ${remResult.error}`);
+      return EXIT_CODES.POLICY_BLOCKERS;
+    }
+
+    if (remResult.status === REMEDIATION_STATUSES.REMEDIATED_AND_VERIFIED) {
+      console.log(`\nSuccessfully applied ${remResult.patches.length} remediation patches.`);
+      console.log(`Rollback checkpoint created: ${remResult.checkpoint?.checkpointId}`);
+      console.log(`Retesting verdict: ${remResult.verdict}\n`);
+      if (remResult.afterReport?.policyEvaluation?.outcome === 'BLOCKED') {
+        return EXIT_CODES.POLICY_BLOCKERS;
+      }
+      return EXIT_CODES.SUCCESS_NO_BLOCKERS;
+    }
+
+    if (remResult.status === REMEDIATION_STATUSES.FAILED) {
+      console.error(`Remediation failed: ${remResult.error}`);
+      return EXIT_CODES.TOOL_ERROR;
+    }
   }
 
   let report;
