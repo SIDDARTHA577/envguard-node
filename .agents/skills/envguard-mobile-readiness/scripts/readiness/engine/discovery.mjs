@@ -127,7 +127,10 @@ function classifyApplication(appDir, relPath, manifest) {
   // Detect Android Native
   const hasAndroidXml =
     fs.existsSync(path.join(appDir, 'AndroidManifest.xml')) ||
-    fs.existsSync(path.join(appDir, 'src', 'main', 'AndroidManifest.xml'));
+    fs.existsSync(path.join(appDir, 'src', 'main', 'AndroidManifest.xml')) ||
+    fs.existsSync(path.join(appDir, 'app', 'src', 'main', 'AndroidManifest.xml')) ||
+    fs.existsSync(path.join(appDir, 'build.gradle')) ||
+    fs.existsSync(path.join(appDir, 'build.gradle.kts'));
   if (hasAndroidXml && !hasReactNative && !frameworks.includes('flutter')) {
     if (!languages.includes('java')) languages.push('java');
     if (!languages.includes('kotlin')) languages.push('kotlin');
