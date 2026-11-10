@@ -25,7 +25,8 @@ This roadmap reflects genuine engineering priorities and planned capabilities ba
 - [x] **Phase 11 — Reviewable Fixes & Automated Retesting Workflow**: Non-destructive remediation patches (`ENV-001`, `ENV-002`, `BUILD-001`) with unified diff previews, atomic rollback checkpoints, mandatory human approval gates, and automatic retesting. (Completed — PR #21)
 - [x] **Phase 12 — Real Deployment, Scalability & Reliability Validation**: Empirical deployment readiness checklists (unprivileged containers, health probes, k8s manifests, CI/CD gates), workload classification (`ESTIMATED`, `SIMULATED`, `MEASURED`, `VERIFIED_STAGING`, `UNKNOWN_PRODUCTION`), and strict no-auto-deploy enforcement. (Completed — PR #22)
 - [x] **Phase 13 — Independent Developer & Agent Testing**: Verification across 12 distinct project archetypes and 4 agent host directory structures (`.agents`, `.claude`, `.cursor`, `skills/`) with honest adoption disclosures. (Completed — PR #23)
-- [x] **Phase 14 — Final Platform Stabilization**: Zero-dependency boundary audit, comprehensive documentation synchronization, and release-ready maintainer review package. (Completed — PR #24)
+- [x] **Phase 14 — Final Platform Stabilization**: Zero-dependency boundary audit, comprehensive documentation synchronization, and release-ready maintainer review package. (Completed — PR #27)
+- [x] **Phase 14.1 — Security Hardening, Remediation Integrity & GitHub Presentation**: Real test-framework discovery to eliminate fabricated passing stubs, path traversal and symlink guards for backup checkpoints, secret omission from backup manifests, and modernized GitHub repository presentation.
 
 ---
 

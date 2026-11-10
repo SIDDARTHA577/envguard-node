@@ -63,7 +63,9 @@ project.xcworkspace/xcuserdata/
 .expo/
 .expo-shared/
 
-# EnvGuard temporary test artifacts & cache
+# EnvGuard temporary test artifacts, checkpoints & cache
+.envguard/backups/
+.envguard/checkpoints/
 .envguard/reports/
 .envguard/cache/
 

@@ -50,6 +50,138 @@ export function discoverEnvVarNames(projectDir, files = []) {
 }
 
 /**
+ * Discovers configured test frameworks from project dependencies, files, and configurations.
+ * Prevents fabricating passing test stubs.
+ *
+ * @param {string} projectDir - Base project directory
+ * @param {object} [pkg={}] - Parsed package.json object
+ * @param {string[]} [files=[]] - Known project-relative file list
+ * @returns {{
+ *   framework: string|null,
+ *   command: string|null,
+ *   confidence: 'verified_fact' | 'ambiguous' | 'none',
+ *   status: 'RECOMMENDED' | 'MANUAL_REVIEW' | 'NOT_RUN',
+ *   recommendation: string
+ * }}
+ */
+export function discoverTestFramework(projectDir, pkg = {}, files = []) {
+  const allDeps = {
+    ...(pkg.devDependencies || {}),
+    ...(pkg.dependencies || {}),
+  };
+
+  // Known JavaScript/TypeScript test frameworks in dependencies
+  if (allDeps['vitest']) {
+    return {
+      framework: 'vitest',
+      command: 'vitest run',
+      confidence: 'verified_fact',
+      status: 'RECOMMENDED',
+      recommendation: 'Configure Vitest as the project test runner with "vitest run".',
+    };
+  }
+
+  if (allDeps['jest'] || allDeps['ts-jest']) {
+    return {
+      framework: 'jest',
+      command: 'jest',
+      confidence: 'verified_fact',
+      status: 'RECOMMENDED',
+      recommendation: 'Configure Jest as the project test runner with "jest".',
+    };
+  }
+
+  if (allDeps['mocha'] || allDeps['ts-mocha']) {
+    return {
+      framework: 'mocha',
+      command: 'mocha',
+      confidence: 'verified_fact',
+      status: 'RECOMMENDED',
+      recommendation: 'Configure Mocha as the project test runner with "mocha".',
+    };
+  }
+
+  if (allDeps['ava']) {
+    return {
+      framework: 'ava',
+      command: 'ava',
+      confidence: 'verified_fact',
+      status: 'RECOMMENDED',
+      recommendation: 'Configure AVA as the project test runner with "ava".',
+    };
+  }
+
+  if (allDeps['@playwright/test']) {
+    return {
+      framework: 'playwright',
+      command: 'playwright test',
+      confidence: 'verified_fact',
+      status: 'RECOMMENDED',
+      recommendation: 'Configure Playwright as the test runner with "playwright test".',
+    };
+  }
+
+  if (allDeps['tap'] || allDeps['tape']) {
+    return {
+      framework: 'tap',
+      command: 'tap',
+      confidence: 'verified_fact',
+      status: 'RECOMMENDED',
+      recommendation: 'Configure Tap as the project test runner with "tap".',
+    };
+  }
+
+  // Check config files in project root
+  const hasVitestConfig = files.some((f) => f === 'vitest.config.ts' || f === 'vitest.config.js' || f === 'vitest.config.mjs');
+  if (hasVitestConfig) {
+    return {
+      framework: 'vitest',
+      command: 'vitest run',
+      confidence: 'verified_fact',
+      status: 'RECOMMENDED',
+      recommendation: 'Configure Vitest based on existing vitest.config file.',
+    };
+  }
+
+  const hasJestConfig = files.some((f) => f === 'jest.config.ts' || f === 'jest.config.js' || f === 'jest.config.json');
+  if (hasJestConfig) {
+    return {
+      framework: 'jest',
+      command: 'jest',
+      confidence: 'verified_fact',
+      status: 'RECOMMENDED',
+      recommendation: 'Configure Jest based on existing jest.config file.',
+    };
+  }
+
+  // Check for test files without a declared framework (ambiguous setup)
+  const testFilePatterns = [
+    /(?:^|\/)(?:test|tests|__tests__)\/.+\.[cm]?[jt]sx?$/,
+    /\.(?:test|spec)\.[cm]?[jt]sx?$/,
+  ];
+  const matchingTestFiles = files.filter((f) => testFilePatterns.some((p) => p.test(f)));
+
+  if (matchingTestFiles.length > 0) {
+    return {
+      framework: null,
+      command: null,
+      confidence: 'ambiguous',
+      status: 'MANUAL_REVIEW',
+      recommendation: `Found ${matchingTestFiles.length} test file(s) but no recognized test framework in dependencies. Manual engineering review required to configure test script.`,
+    };
+  }
+
+  // No test framework and no test files
+  return {
+    framework: null,
+    command: null,
+    confidence: 'none',
+    status: 'NOT_RUN',
+    recommendation: 'No automated test suite detected. Install a test framework (such as Vitest or Jest) and implement unit/integration tests before configuring "npm test".',
+  };
+}
+
+/**
  * Generates safe, reviewable remediation patches for actionable assessment findings.
  *
  * @param {string} projectDir - Target application directory
@@ -141,8 +273,9 @@ export function generateRemediationPatches(projectDir, findings = [], files = []
       });
     }
 
-    // 3. BUILD-001: Missing test script in package.json
-    if (f.id === 'BUILD-001' && f.explanation?.includes('test')) {
+    // 3. BUILD-002 / BUILD-001: Missing test script in package.json
+    // CRITICAL: Must NEVER generate fake passing test scripts like 'echo "Tests passing" && exit 0'
+    if (f.id === 'BUILD-002' || (f.id === 'BUILD-001' && f.explanation?.includes('test'))) {
       const targetRelPath = path.join(f.targetPath || '.', 'package.json');
       const fullPath = path.join(projectDir, targetRelPath);
 
@@ -151,21 +284,35 @@ export function generateRemediationPatches(projectDir, findings = [], files = []
           const current = fs.readFileSync(fullPath, 'utf8');
           const pkg = JSON.parse(current);
           pkg.scripts = pkg.scripts || {};
-          if (!pkg.scripts.test) {
-            pkg.scripts.test = 'echo "Tests passing" && exit 0';
-            const proposed = JSON.stringify(pkg, null, 2) + '\n';
 
-            patches.push({
-              patchId: `PATCH-${f.id}-ADD-TEST-SCRIPT`,
-              findingId: f.id,
-              title: 'Add Standardized Test Script to package.json',
-              targetFile: targetRelPath,
-              action: 'modify',
-              currentContent: current,
-              proposedContent: proposed,
-              unifiedDiff: generateUnifiedDiff(targetRelPath, current, proposed),
-              description: 'Declares automated test script entry in package.json to permit CI and readiness test execution.',
-            });
+          const currentTestScript = pkg.scripts.test;
+          const isMissingOrPlaceholder =
+            !currentTestScript ||
+            currentTestScript.includes('no test specified') ||
+            currentTestScript.includes('echo "Tests passing"');
+
+          if (isMissingOrPlaceholder) {
+            const discovery = discoverTestFramework(projectDir, pkg, files);
+
+            if (discovery.status === 'RECOMMENDED' && discovery.command) {
+              // Real verified test framework detected in dependencies
+              pkg.scripts.test = discovery.command;
+              const proposed = JSON.stringify(pkg, null, 2) + '\n';
+
+              patches.push({
+                patchId: `PATCH-${f.id}-ADD-VERIFIED-TEST-SCRIPT`,
+                findingId: f.id,
+                title: `Configure Verified Test Script (${discovery.framework}) in package.json`,
+                targetFile: targetRelPath,
+                action: 'modify',
+                currentContent: current,
+                proposedContent: proposed,
+                unifiedDiff: generateUnifiedDiff(targetRelPath, current, proposed),
+                description: `Configures verified "test" script using discovered ${discovery.framework} test runner.`,
+                framework: discovery.framework,
+              });
+            }
+            // If discovery is NOT_RUN or MANUAL_REVIEW, no fake patch is generated.
           }
         } catch {}
       }
