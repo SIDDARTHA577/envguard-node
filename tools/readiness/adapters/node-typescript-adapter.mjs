@@ -2445,6 +2445,34 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
 
       const scriptVal = scripts[scriptKey];
 
+      // Detect placeholder or fabricated test scripts
+      if (
+        conf.name === 'test' &&
+        typeof scriptVal === 'string' &&
+        (scriptVal.includes('no test specified') ||
+          scriptVal.includes('Tests passing') ||
+          scriptVal.trim() === 'exit 0' ||
+          scriptVal.trim() === 'true')
+      ) {
+        findings.push(
+          this.createFinding({
+            id: conf.id,
+            category: 'build_test',
+            status: 'WARNING',
+            severity: 'high',
+            title: 'Placeholder or Fabricated Test Script Detected',
+            explanation: `Declared test script ("${scriptVal}") does not execute automated tests. Fabricated or placeholder test commands do not verify application correctness.`,
+            evidence: { file: 'package.json', snippet: scriptVal },
+            checkMethod: 'static_analysis',
+            recommendation: 'Replace placeholder test script with a real test runner (e.g. Vitest, Jest) executing real test files.',
+            manualVerificationRequired: true,
+            confidence: 'verified_fact',
+            targetPath: target.path,
+          })
+        );
+        continue;
+      }
+
       if (!allowExec) {
         findings.push(
           this.createFinding({
