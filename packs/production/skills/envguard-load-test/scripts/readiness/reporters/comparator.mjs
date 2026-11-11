@@ -109,9 +109,45 @@ export function compareReadinessReports(beforeReport, afterReport, options = {})
   const noLongerApplicableFindings = [];
   const indeterminateFindings = [];
 
+  const beforeTargetCounts = new Map();
+  for (const f of beforeFindings) {
+    const tk = `${f.id}::${f.targetPath || '.'}`;
+    beforeTargetCounts.set(tk, (beforeTargetCounts.get(tk) || 0) + 1);
+  }
+  const afterByTarget = new Map();
+  for (const f of afterFindings) {
+    const tk = `${f.id}::${f.targetPath || '.'}`;
+    const list = afterByTarget.get(tk) || [];
+    list.push(f);
+    afterByTarget.set(tk, list);
+  }
+  const matchedAfterKeys = new Set();
+
   // 6. Inspect baseline findings against follow-up findings
   for (const [key, b] of beforeMap.entries()) {
-    const a = afterMap.get(key);
+    let a = afterMap.get(key);
+    let matchedKey = a ? key : null;
+
+    if (!a) {
+      const tk = `${b.id}::${b.targetPath || '.'}`;
+      const candidates = afterByTarget.get(tk) || [];
+      if (
+        (beforeTargetCounts.get(tk) || 0) === 1 &&
+        candidates.length === 1 &&
+        candidates[0].status !== 'FAIL' &&
+        candidates[0].status !== 'NOT_APPLICABLE'
+      ) {
+        const candidateKey = getFindingKey(candidates[0]);
+        if (!beforeMap.has(candidateKey)) {
+          a = candidates[0];
+          matchedKey = candidateKey;
+        }
+      }
+    }
+
+    if (matchedKey) {
+      matchedAfterKeys.add(matchedKey);
+    }
 
     if (!a) {
       // Finding disappeared from follow-up report
@@ -223,7 +259,7 @@ export function compareReadinessReports(beforeReport, afterReport, options = {})
 
   // 7. Inspect new findings in follow-up report
   for (const [key, a] of afterMap.entries()) {
-    if (!beforeMap.has(key)) {
+    if (!beforeMap.has(key) && !matchedAfterKeys.has(key)) {
       if (a.status === 'FAIL' || a.status === 'WARNING') {
         newFindings.push({
           id: a.id,
