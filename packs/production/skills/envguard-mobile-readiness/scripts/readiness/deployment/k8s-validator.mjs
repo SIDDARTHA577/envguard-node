@@ -32,7 +32,7 @@ export function validateKubernetesManifests(projectDir, files = []) {
 
   for (const relPath of k8sFiles) {
     const fullPath = path.join(projectDir, relPath);
-    let content = '';
+    let content;
     try {
       content = fs.readFileSync(fullPath, 'utf8');
     } catch {

@@ -26,7 +26,9 @@ This roadmap reflects genuine engineering priorities and planned capabilities ba
 - [x] **Phase 12 — Real Deployment, Scalability & Reliability Validation**: Empirical deployment readiness checklists (unprivileged containers, health probes, k8s manifests, CI/CD gates), workload classification (`ESTIMATED`, `SIMULATED`, `MEASURED`, `VERIFIED_STAGING`, `UNKNOWN_PRODUCTION`), and strict no-auto-deploy enforcement. (Completed — PR #22)
 - [x] **Phase 13 — Independent Developer & Agent Testing**: Verification across 12 distinct project archetypes and 4 agent host directory structures (`.agents`, `.claude`, `.cursor`, `skills/`) with honest adoption disclosures. (Completed — PR #23)
 - [x] **Phase 14 — Final Platform Stabilization**: Zero-dependency boundary audit, comprehensive documentation synchronization, and release-ready maintainer review package. (Completed — PR #27)
-- [x] **Phase 14.1 — Security Hardening, Remediation Integrity & GitHub Presentation**: Real test-framework discovery to eliminate fabricated passing stubs, path traversal and symlink guards for backup checkpoints, secret omission from backup manifests, and modernized GitHub repository presentation.
+- [x] **Phase 14.1 — Security Hardening, Remediation Integrity & GitHub Presentation**: Real test-framework discovery to eliminate fabricated passing stubs, path traversal and symlink guards for backup checkpoints, secret omission from backup manifests, and modernized GitHub repository presentation. (Completed — PR #28)
+- [x] **Phase 14.2 — Filesystem, Checkpoint Restoration & Concurrent-Edit Security**: Canonical root enforcement on rollback, manifest/backup integrity sealing, concurrent modification conflict detection, Windows NTFS ACL notices, and verified `.gitignore` patterns (`!.env.example`). (Completed — PR #29)
+- [x] **Phase 14.3 — Evidence Integrity & Layer B Quality Gates**: Strict separation of test framework declaration, runner availability, test file presence, and runtime execution (`TESTS_PASSED`), release-policy blocking on scanner crashes (`ERROR`) and incomplete coverage, plus ESLint/`checkJs` coverage across `tools/` and `scripts/`.
 
 ---
 

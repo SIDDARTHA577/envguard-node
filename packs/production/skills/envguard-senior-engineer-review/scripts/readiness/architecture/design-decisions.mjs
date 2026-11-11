@@ -90,7 +90,7 @@ export function evaluateSystemDesignDecisions(projectDir, inventory, requirement
 /**
  * Evaluates a single system design concept with all 12 mandatory architectural dimensions.
  */
-function evaluateSingleConcept(conceptId, applicability, inventory, requirements, files, allSourceText, readFileSafe, projectDir) {
+function evaluateSingleConcept(conceptId, applicability, inventory, requirements, files, allSourceText, _readFileSafe, _projectDir) {
   switch (conceptId) {
     // =========================================================================
     // 1. Load Balancing
@@ -104,7 +104,7 @@ function evaluateSingleConcept(conceptId, applicability, inventory, requirements
         files.some((f) => f.includes('health') || f.includes('ready')) ||
         /\/health|\/healthz|\/ping/i.test(allSourceText);
 
-      let status = 'NOT_APPLICABLE';
+      let status;
       let finding = null;
 
       const infraComp = inventory.components.find((c) => c.type === 'infrastructure');
@@ -180,7 +180,7 @@ function evaluateSingleConcept(conceptId, applicability, inventory, requirements
         !allSourceText.includes('lru-cache') &&
         !allSourceText.includes('max:');
 
-      let status = 'NOT_APPLICABLE';
+      let status;
       let finding = null;
 
       const hasCacheLibrary = /lru-cache|node-cache|memcached/i.test(allSourceText);
@@ -260,7 +260,7 @@ function evaluateSingleConcept(conceptId, applicability, inventory, requirements
     // =========================================================================
     case 'api_gateway': {
       const hasGateway = inventory.components.some((c) => c.type === 'api_gateway');
-      let status = 'NOT_APPLICABLE';
+      let status;
       let finding = null;
 
       if (!applicability.applicable && hasGateway) {
@@ -307,7 +307,7 @@ function evaluateSingleConcept(conceptId, applicability, inventory, requirements
     // =========================================================================
     case 'microservices': {
       const isMicroservices = inventory.topologyType === 'microservices';
-      let status = 'NOT_APPLICABLE';
+      let status;
       let finding = null;
 
       if (isMicroservices && applicability.level === APPLICABILITY_LEVELS.NOT_RECOMMENDED) {
@@ -380,7 +380,7 @@ function evaluateSingleConcept(conceptId, applicability, inventory, requirements
     case 'replication': {
       const hasDb = inventory.detectedTechnologies.includes('database');
       const mentionsReplication = /replica|read_replica|standby|slave/i.test(allSourceText);
-      let status = 'NOT_APPLICABLE';
+      let status;
       let finding = null;
 
       if (hasDb && requirements.availability?.level === 'high_availability' && !mentionsReplication) {
@@ -452,7 +452,7 @@ function evaluateSingleConcept(conceptId, applicability, inventory, requirements
     // =========================================================================
     case 'message_queues': {
       const usesQueue = inventory.detectedTechnologies.includes('message-queue');
-      let status = 'NOT_APPLICABLE';
+      let status;
       let finding = null;
 
       if (usesQueue) {
@@ -699,7 +699,7 @@ function evaluateSingleConcept(conceptId, applicability, inventory, requirements
     // =========================================================================
     case 'circuit_breaker': {
       const usesCircuitBreaker = /opossum|brakes|resilience4j|cockatiel/i.test(allSourceText);
-      let status = 'NOT_APPLICABLE';
+      let status;
       let finding = null;
 
       if (applicability.applicable) {

@@ -127,7 +127,7 @@ describe('Phase 11 — Reviewable Fixes & Automated Retesting Workflow', () => {
         },
       ];
 
-      const patches = generateRemediationPatches(tempDir, mockFindings, ['package.json']);
+      const patches = generateRemediationPatches(tempDir, mockFindings, ['package.json', 'tests/app.test.ts']);
       expect(patches.length).toBe(1);
       const testPatch = patches[0];
       expect(testPatch.findingId).toBe('BUILD-002');

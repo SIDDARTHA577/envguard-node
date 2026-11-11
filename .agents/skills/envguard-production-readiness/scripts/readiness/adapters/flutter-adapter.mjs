@@ -89,7 +89,7 @@ export class FlutterAdapter extends BaseAdapter {
     ];
   }
 
-  getApplicableChecks(target, context) {
+  getApplicableChecks(_target, _context) {
     return [
       { id: 'FLUTTER-DISC-001', name: 'Flutter Application Descriptor Present (pubspec.yaml)', category: 'discovery', required: true },
       { id: 'FLUTTER-DISC-002', name: 'Explicit Dart SDK Constraint & Null Safety Enforced', category: 'discovery', required: true },
@@ -132,7 +132,7 @@ export class FlutterAdapter extends BaseAdapter {
     if (hasPubspec) {
       try {
         pubspecContent = fs.readFileSync(pubspecPath, 'utf8');
-      } catch {}
+      } catch { /* ignore non-critical read/parse error */ }
     }
 
     // =========================================================================
@@ -341,7 +341,7 @@ export class FlutterAdapter extends BaseAdapter {
             break;
           }
         }
-      } catch {}
+      } catch { /* ignore non-critical read/parse error */ }
       if (rawPrefsTokenUsage) break;
     }
 
@@ -424,7 +424,7 @@ export class FlutterAdapter extends BaseAdapter {
             break;
           }
         }
-      } catch {}
+      } catch { /* ignore non-critical read/parse error */ }
       if (leakedSecret) break;
     }
 
@@ -500,7 +500,7 @@ export class FlutterAdapter extends BaseAdapter {
             }
           }
         }
-      } catch {}
+      } catch { /* ignore non-critical read/parse error */ }
     }
 
     if (missingDisposal) {
@@ -554,7 +554,7 @@ export class FlutterAdapter extends BaseAdapter {
           hasGlobalErrorHandling = true;
           break;
         }
-      } catch {}
+      } catch { /* ignore non-critical read/parse error */ }
     }
 
     if (hasGlobalErrorHandling) {
@@ -637,7 +637,7 @@ export class FlutterAdapter extends BaseAdapter {
         isIsolated: true,
       });
       if (check.exitCode === 0) flutterAvailable = true;
-    } catch {}
+    } catch { /* ignore non-critical read/parse error */ }
 
     if (!flutterAvailable) {
       findings.push(

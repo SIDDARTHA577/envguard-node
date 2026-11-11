@@ -431,7 +431,7 @@ Below is a sanitized excerpt from an automated EnvGuard readiness report generat
 ## L. Security & Privacy Model
 
 - **Read-Only by Default**: The auditor never executes project code, package scripts, or external commands unless explicit authorization flags (`--allow-exec`) and verified containment (`--trust-project` or container boundary) are provided.
-- **Diagnostic Secret Redaction**: Built-in error messages, serialized exceptions, and JSON outputs are designed and tested not to include evaluated secret values.
+- **Diagnostic Secret Redaction (With Boundaries)**: Built-in validation error messages, serialized exceptions, and JSON diagnostics are tested not to include raw evaluated environment variable values, and readiness output uses pattern sanitization to mask known credential patterns. *Limitation*: EnvGuard cannot prevent secret disclosure if user application code, custom validators, or third-party child processes independently log raw secrets.
 - **Safe Dotenv Parser**: Pure JavaScript parser. Does not execute shell commands, backticks, or subshell substitutions.
 - **Prototype Pollution Defense**: Explicitly rejects `__proto__`, `constructor`, and `prototype` keys during schema ingestion and JSON loading.
 - **Strict No-Auto-Deploy Guard**: The deployment gate evaluates container security, Kubernetes probes, and CI/CD gates, but strictly enforces `autoDeployAllowed: false`. Autonomous agents cannot trigger production deployments.
@@ -446,9 +446,9 @@ See [SECURITY.md](./SECURITY.md) for vulnerability disclosure procedures.
 ## M. Testing & Quality Assurance
 
 EnvGuard enforces rigorous quality assurance across multiple environments:
-- **Comprehensive Test Matrix**: 39 test suites containing 499 unit, integration, and security regression tests (100% passing as of November 2026).
+- **Automated Test Matrix**: Unit, integration, remediation security, and platform adapter test suites executed continuously across all commits via `npm test`.
 - **Supported Runtimes**: Node.js `22.x`, `24.x`, and `26.x` tested on both **Ubuntu Linux** and **Windows Server** via GitHub Actions.
-- **Static Analysis & Security**: CodeQL static analysis workflow and ESLint with zero warnings or errors.
+- **Static Analysis & Cross-Layer Verification**: CodeQL security scanning, ESLint across Core (`src/`, `tests/`) and Layer B tooling (`tools/`, `scripts/`), plus TypeScript type checking (`tsc --noEmit` and `tsc -p tsconfig.tools.json`).
 - **Zero Runtime Dependencies**: Layer A Core maintains zero third-party dependencies (`dependencies: {}`).
 - **Tarball Smoke Tests**: Every commit verifies clean tarball compilation, packaging, and runtime execution across ESM, CommonJS, and CLI binary via `npm run test:pack`.
 

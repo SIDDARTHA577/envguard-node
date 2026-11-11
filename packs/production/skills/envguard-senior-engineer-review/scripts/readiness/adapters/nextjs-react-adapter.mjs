@@ -71,7 +71,7 @@ export class NextJsReactAdapter extends BaseAdapter {
     ];
   }
 
-  getApplicableChecks(target, context) {
+  getApplicableChecks(_target, _context) {
     return [
       { id: 'NEXT-001', name: 'Next.js & React Architecture Configuration', category: 'discovery', required: true },
       { id: 'NEXT-002', name: 'Client-Server Environment Boundary Security', category: 'security', required: true },
@@ -161,7 +161,7 @@ export class NextJsReactAdapter extends BaseAdapter {
               if (clientBoundaryViolation) break;
             }
           }
-        } catch {}
+        } catch { /* ignore non-critical read/parse error */ }
       }
       if (clientBoundaryViolation) break;
     }
@@ -341,7 +341,7 @@ export class NextJsReactAdapter extends BaseAdapter {
           const content = fs.readFileSync(full, 'utf8');
           if (content.includes('next/image')) usesNextImage = true;
           if (content.includes('next/font')) usesNextFont = true;
-        } catch {}
+        } catch { /* ignore non-critical read/parse error */ }
       }
       if (usesNextImage && usesNextFont) break;
     }
@@ -444,7 +444,7 @@ export class NextJsReactAdapter extends BaseAdapter {
           ) {
             hasSecurityHeaders = true;
           }
-        } catch {}
+        } catch { /* ignore non-critical read/parse error */ }
         break;
       }
     }
@@ -584,7 +584,7 @@ export class NextJsReactAdapter extends BaseAdapter {
               hasReactErrorBoundary = true;
               break;
             }
-          } catch {}
+          } catch { /* ignore non-critical read/parse error */ }
         }
       }
 
@@ -648,7 +648,7 @@ export class NextJsReactAdapter extends BaseAdapter {
               break;
             }
           }
-        } catch {}
+        } catch { /* ignore non-critical read/parse error */ }
       }
     }
 

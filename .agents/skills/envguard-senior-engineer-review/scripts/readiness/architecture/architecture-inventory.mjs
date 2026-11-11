@@ -309,7 +309,7 @@ export function buildArchitectureInventory(projectDir, inventoryGraph) {
         if (m) {
           k8sReplicaCount = parseInt(m[1], 10);
         }
-      } catch {}
+      } catch { /* ignore non-critical read/parse error */ }
     }
   }
   if (files.some((f) => f.endsWith('.tf') || f.endsWith('.tfvars'))) {

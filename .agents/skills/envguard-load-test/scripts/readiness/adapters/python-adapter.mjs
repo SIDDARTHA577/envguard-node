@@ -110,7 +110,7 @@ export class PythonAdapter extends BaseAdapter {
         try {
           const content = fs.readFileSync(full, 'utf8').toLowerCase();
           if (content.includes(depLower)) return true;
-        } catch {}
+        } catch { /* ignore non-critical read/parse error */ }
       }
     }
     return false;
@@ -129,7 +129,7 @@ export class PythonAdapter extends BaseAdapter {
     ];
   }
 
-  getApplicableChecks(target, context) {
+  getApplicableChecks(_target, _context) {
     return [
       { id: 'PY-DISC-001', name: 'Python Project Manifest & Packaging Configured', category: 'discovery', required: true },
       { id: 'PY-DISC-002', name: 'Explicit Python Runtime Version Declared', category: 'discovery', required: true },
@@ -235,14 +235,14 @@ export class PythonAdapter extends BaseAdapter {
           declaredPythonVersion = match[1];
           versionEvidenceFile = 'pyproject.toml';
         }
-      } catch {}
+      } catch { /* ignore non-critical read/parse error */ }
     }
 
     if (!declaredPythonVersion && fs.existsSync(path.join(targetDir, '.python-version'))) {
       try {
         declaredPythonVersion = fs.readFileSync(path.join(targetDir, '.python-version'), 'utf8').trim();
         versionEvidenceFile = '.python-version';
-      } catch {}
+      } catch { /* ignore non-critical read/parse error */ }
     }
 
     if (declaredPythonVersion) {
@@ -344,7 +344,7 @@ export class PythonAdapter extends BaseAdapter {
           usesEnvLibrary = true;
           break;
         }
-      } catch {}
+      } catch { /* ignore non-critical read/parse error */ }
     }
 
     if (hasEnvExample && usesEnvLibrary) {
@@ -405,7 +405,6 @@ export class PythonAdapter extends BaseAdapter {
     // =========================================================================
     const isDjango =
       fs.existsSync(path.join(targetDir, 'manage.py')) || this.hasDependency(targetDir, 'django');
-    const isFastAPI = this.hasDependency(targetDir, 'fastapi');
     const isFlask = this.hasDependency(targetDir, 'flask');
 
     // --- PY-SEC-001: SECRET_KEY & DEBUG Mode ---
@@ -450,7 +449,7 @@ export class PythonAdapter extends BaseAdapter {
             hasLoadedSecretKey = true;
           }
         }
-      } catch {}
+      } catch { /* ignore non-critical read/parse error */ }
     }
 
     if (debugTrueFinding) {
@@ -549,7 +548,7 @@ export class PythonAdapter extends BaseAdapter {
           ) {
             configuredAllowedHosts = true;
           }
-        } catch {}
+        } catch { /* ignore non-critical read/parse error */ }
       }
 
       if (wildcardAllowedHosts) {
@@ -628,7 +627,7 @@ export class PythonAdapter extends BaseAdapter {
           ) {
             secureCookiesConfigured = true;
           }
-        } catch {}
+        } catch { /* ignore non-critical read/parse error */ }
       }
 
       if (insecureCookieSetting) {
@@ -724,7 +723,7 @@ export class PythonAdapter extends BaseAdapter {
             hasSafeQueries = true;
           }
         }
-      } catch {}
+      } catch { /* ignore non-critical read/parse error */ }
       if (rawSqlInjectionFinding) break;
     }
 
@@ -797,7 +796,7 @@ export class PythonAdapter extends BaseAdapter {
             hasCsrfMiddleware = true;
             break;
           }
-        } catch {}
+        } catch { /* ignore non-critical read/parse error */ }
       }
 
       if (hasCsrfMiddleware) {
@@ -877,7 +876,7 @@ export class PythonAdapter extends BaseAdapter {
         ) {
           configuredCors = true;
         }
-      } catch {}
+      } catch { /* ignore non-critical read/parse error */ }
     }
 
     if (insecureCors) {

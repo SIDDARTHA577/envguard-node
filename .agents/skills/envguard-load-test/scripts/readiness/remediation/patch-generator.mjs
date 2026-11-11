@@ -1,5 +1,5 @@
-import fs from 'node:fs';
 import path from 'node:path';
+import { TEST_VERIFICATION_STATES } from '../constants.mjs';
 import { generateUnifiedDiff } from './diff-viewer.mjs';
 import {
   assertSafeProjectRelativePathDetails,
@@ -44,7 +44,9 @@ export function discoverEnvVarNames(projectDir, files = []) {
       for (const m of pyMatches) {
         if (m[1]) discovered.add(m[1]);
       }
-    } catch {}
+    } catch {
+      /* Ignore unreadable or escaped candidate files during key discovery */
+    }
   }
 
   // Sensible default keys if none discovered
@@ -57,8 +59,29 @@ export function discoverEnvVarNames(projectDir, files = []) {
 }
 
 /**
- * Discovers configured test frameworks from project dependencies, files, and configurations.
- * Prevents fabricating passing test stubs.
+ * Checks whether a local test runner package or binary appears installed inside node_modules.
+ *
+ * @param {string} projectDir
+ * @param {string|null} pkgName
+ * @returns {boolean}
+ */
+function checkRunnerInstalledOnDisk(projectDir, pkgName) {
+  if (!pkgName || !projectDir) return false;
+  try {
+    const resolvedDir = path.resolve(projectDir);
+    const binPath = path.join(resolvedDir, 'node_modules', '.bin', pkgName);
+    const pkgJsonPath = path.join(resolvedDir, 'node_modules', pkgName, 'package.json');
+    const winBinPath = `${binPath}.cmd`;
+    return Boolean(lstatSafe(binPath) || lstatSafe(winBinPath) || lstatSafe(pkgJsonPath));
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Discovers configured test frameworks, installed runner availability, and actual test files.
+ * Strictly separates dependency declaration from test existence and runtime execution.
+ * Never classifies static discovery as TESTS_PASSED or TEST_EXECUTED.
  *
  * @param {string} projectDir - Base project directory
  * @param {object} [pkg={}] - Parsed package.json object
@@ -66,9 +89,18 @@ export function discoverEnvVarNames(projectDir, files = []) {
  * @returns {{
  *   framework: string|null,
  *   command: string|null,
+ *   frameworkDeclared: boolean,
+ *   runnerAvailable: boolean,
+ *   testFilesFound: boolean,
+ *   testFilesCount: number,
+ *   sampleTestFiles: string[],
+ *   testExecuted: boolean,
+ *   states: string[],
+ *   verificationState: string,
  *   confidence: 'verified_fact' | 'ambiguous' | 'none',
  *   status: 'RECOMMENDED' | 'MANUAL_REVIEW' | 'NOT_RUN',
- *   recommendation: string
+ *   recommendation: string,
+ *   limitations: string[]
  * }}
  */
 export function discoverTestFramework(projectDir, pkg = {}, files = []) {
@@ -77,114 +109,151 @@ export function discoverTestFramework(projectDir, pkg = {}, files = []) {
     ...(pkg.dependencies || {}),
   };
 
-  // Known JavaScript/TypeScript test frameworks in dependencies
+  let framework = null;
+  let pkgName = null;
+  let command = null;
+
   if (allDeps['vitest']) {
-    return {
-      framework: 'vitest',
-      command: 'vitest run',
-      confidence: 'verified_fact',
-      status: 'RECOMMENDED',
-      recommendation: 'Configure Vitest as the project test runner with "vitest run".',
-    };
+    framework = 'vitest';
+    pkgName = 'vitest';
+    command = 'vitest run';
+  } else if (allDeps['jest'] || allDeps['ts-jest']) {
+    framework = 'jest';
+    pkgName = allDeps['jest'] ? 'jest' : 'ts-jest';
+    command = 'jest';
+  } else if (allDeps['mocha'] || allDeps['ts-mocha']) {
+    framework = 'mocha';
+    pkgName = allDeps['mocha'] ? 'mocha' : 'ts-mocha';
+    command = 'mocha';
+  } else if (allDeps['ava']) {
+    framework = 'ava';
+    pkgName = 'ava';
+    command = 'ava';
+  } else if (allDeps['@playwright/test']) {
+    framework = 'playwright';
+    pkgName = '@playwright/test';
+    command = 'playwright test';
+  } else if (allDeps['tap'] || allDeps['tape']) {
+    framework = allDeps['tap'] ? 'tap' : 'tape';
+    pkgName = framework;
+    command = framework;
+  } else if (files.some((f) => f === 'vitest.config.ts' || f === 'vitest.config.js' || f === 'vitest.config.mjs')) {
+    framework = 'vitest';
+    pkgName = 'vitest';
+    command = 'vitest run';
+  } else if (files.some((f) => f === 'jest.config.ts' || f === 'jest.config.js' || f === 'jest.config.json')) {
+    framework = 'jest';
+    pkgName = 'jest';
+    command = 'jest';
   }
 
-  if (allDeps['jest'] || allDeps['ts-jest']) {
-    return {
-      framework: 'jest',
-      command: 'jest',
-      confidence: 'verified_fact',
-      status: 'RECOMMENDED',
-      recommendation: 'Configure Jest as the project test runner with "jest".',
-    };
-  }
+  const frameworkDeclared = Boolean(framework);
+  const runnerAvailable = frameworkDeclared ? checkRunnerInstalledOnDisk(projectDir, pkgName) : false;
 
-  if (allDeps['mocha'] || allDeps['ts-mocha']) {
-    return {
-      framework: 'mocha',
-      command: 'mocha',
-      confidence: 'verified_fact',
-      status: 'RECOMMENDED',
-      recommendation: 'Configure Mocha as the project test runner with "mocha".',
-    };
-  }
-
-  if (allDeps['ava']) {
-    return {
-      framework: 'ava',
-      command: 'ava',
-      confidence: 'verified_fact',
-      status: 'RECOMMENDED',
-      recommendation: 'Configure AVA as the project test runner with "ava".',
-    };
-  }
-
-  if (allDeps['@playwright/test']) {
-    return {
-      framework: 'playwright',
-      command: 'playwright test',
-      confidence: 'verified_fact',
-      status: 'RECOMMENDED',
-      recommendation: 'Configure Playwright as the test runner with "playwright test".',
-    };
-  }
-
-  if (allDeps['tap'] || allDeps['tape']) {
-    return {
-      framework: 'tap',
-      command: 'tap',
-      confidence: 'verified_fact',
-      status: 'RECOMMENDED',
-      recommendation: 'Configure Tap as the project test runner with "tap".',
-    };
-  }
-
-  // Check config files in project root
-  const hasVitestConfig = files.some((f) => f === 'vitest.config.ts' || f === 'vitest.config.js' || f === 'vitest.config.mjs');
-  if (hasVitestConfig) {
-    return {
-      framework: 'vitest',
-      command: 'vitest run',
-      confidence: 'verified_fact',
-      status: 'RECOMMENDED',
-      recommendation: 'Configure Vitest based on existing vitest.config file.',
-    };
-  }
-
-  const hasJestConfig = files.some((f) => f === 'jest.config.ts' || f === 'jest.config.js' || f === 'jest.config.json');
-  if (hasJestConfig) {
-    return {
-      framework: 'jest',
-      command: 'jest',
-      confidence: 'verified_fact',
-      status: 'RECOMMENDED',
-      recommendation: 'Configure Jest based on existing jest.config file.',
-    };
-  }
-
-  // Check for test files without a declared framework (ambiguous setup)
   const testFilePatterns = [
-    /(?:^|\/)(?:test|tests|__tests__)\/.+\.[cm]?[jt]sx?$/,
+    /(?:^|\/)(?:test|tests|__tests__|spec|specs)\/.+\.[cm]?[jt]sx?$/,
     /\.(?:test|spec)\.[cm]?[jt]sx?$/,
   ];
   const matchingTestFiles = files.filter((f) => testFilePatterns.some((p) => p.test(f)));
+  const testFilesFound = matchingTestFiles.length > 0;
 
-  if (matchingTestFiles.length > 0) {
+  const states = [];
+  if (frameworkDeclared) states.push(TEST_VERIFICATION_STATES.FRAMEWORK_DECLARED);
+  if (runnerAvailable) states.push(TEST_VERIFICATION_STATES.RUNNER_AVAILABLE);
+  if (testFilesFound) states.push(TEST_VERIFICATION_STATES.TEST_FILES_FOUND);
+
+  const limitations = [
+    'Static discovery never classifies tests as TEST_EXECUTED or TESTS_PASSED; runtime verification requires --allow-exec.',
+  ];
+
+  if (frameworkDeclared && !testFilesFound) {
+    limitations.push(
+      `Dependency or config for "${framework}" was detected, but zero test files were discovered in the repository.`
+    );
+  }
+  if (frameworkDeclared && !runnerAvailable) {
+    limitations.push(
+      `Runner "${pkgName}" is declared in configuration, but local installation was not found under node_modules/.`
+    );
+  }
+
+  if (frameworkDeclared && testFilesFound) {
+    states.push(TEST_VERIFICATION_STATES.NOT_RUN);
     return {
-      framework: null,
-      command: null,
-      confidence: 'ambiguous',
-      status: 'MANUAL_REVIEW',
-      recommendation: `Found ${matchingTestFiles.length} test file(s) but no recognized test framework in dependencies. Manual engineering review required to configure test script.`,
+      framework,
+      command,
+      frameworkDeclared,
+      runnerAvailable,
+      testFilesFound,
+      testFilesCount: matchingTestFiles.length,
+      sampleTestFiles: matchingTestFiles.slice(0, 5),
+      testExecuted: false,
+      states,
+      verificationState: TEST_VERIFICATION_STATES.NOT_RUN,
+      confidence: 'verified_fact',
+      status: 'RECOMMENDED',
+      recommendation: `Configure "${framework}" test script ("${command}") and authorize execution (--allow-exec) to verify ${matchingTestFiles.length} test file(s).`,
+      limitations,
     };
   }
 
-  // No test framework and no test files
+  if (frameworkDeclared && !testFilesFound) {
+    states.push(TEST_VERIFICATION_STATES.MANUAL_REVIEW);
+    return {
+      framework,
+      command: null,
+      frameworkDeclared,
+      runnerAvailable,
+      testFilesFound: false,
+      testFilesCount: 0,
+      sampleTestFiles: [],
+      testExecuted: false,
+      states,
+      verificationState: TEST_VERIFICATION_STATES.MANUAL_REVIEW,
+      confidence: 'ambiguous',
+      status: 'MANUAL_REVIEW',
+      recommendation: `Framework "${framework}" is declared in dependencies, but zero test files were found. Add real unit/integration tests before treating test configuration as complete.`,
+      limitations,
+    };
+  }
+
+  if (!frameworkDeclared && testFilesFound) {
+    states.push(TEST_VERIFICATION_STATES.MANUAL_REVIEW);
+    return {
+      framework: null,
+      command: null,
+      frameworkDeclared: false,
+      runnerAvailable: false,
+      testFilesFound: true,
+      testFilesCount: matchingTestFiles.length,
+      sampleTestFiles: matchingTestFiles.slice(0, 5),
+      testExecuted: false,
+      states,
+      verificationState: TEST_VERIFICATION_STATES.MANUAL_REVIEW,
+      confidence: 'ambiguous',
+      status: 'MANUAL_REVIEW',
+      recommendation: `Found ${matchingTestFiles.length} test file(s) but no recognized test framework in dependencies. Manual engineering review required to configure test script.`,
+      limitations,
+    };
+  }
+
+  states.push(TEST_VERIFICATION_STATES.NOT_RUN);
   return {
     framework: null,
     command: null,
+    frameworkDeclared: false,
+    runnerAvailable: false,
+    testFilesFound: false,
+    testFilesCount: 0,
+    sampleTestFiles: [],
+    testExecuted: false,
+    states,
+    verificationState: TEST_VERIFICATION_STATES.NOT_RUN,
     confidence: 'none',
     status: 'NOT_RUN',
-    recommendation: 'No automated test suite detected. Install a test framework (such as Vitest or Jest) and implement unit/integration tests before configuring "npm test".',
+    recommendation:
+      'No automated test suite detected. Install a test framework (such as Vitest or Jest) and implement unit/integration tests before configuring "npm test".',
+    limitations,
   };
 }
 
@@ -225,7 +294,6 @@ export function buildSafeGitignoreContent(currentContent, hasNodeProject = false
 
   for (const rule of rulesToEnsure) {
     if (rule === '!.env.example') {
-      // Ensure negation rule exists AND comes after the last '.env.*' pattern
       const willAppendEnvGlob = missingRules.includes('.env.*');
       if (lastExampleNegIdx === -1 || lastEnvGlobIdx > lastExampleNegIdx || willAppendEnvGlob) {
         missingRules.push('!.env.example');
@@ -285,8 +353,12 @@ export function generateRemediationPatches(projectDir, findings = [], files = []
   const patches = [];
   const hasNodeProject = files.some((f) => f === 'package.json' || f.endsWith('/package.json'));
 
-  // Filter only actionable defect findings (FAIL or WARNING)
-  const actionableFindings = findings.filter((f) => f.status === 'FAIL' || f.status === 'WARNING');
+  const actionableFindings = findings.filter(
+    (f) =>
+      f.status === 'FAIL' ||
+      f.status === 'WARNING' ||
+      ((f.id === 'BUILD-002' || f.id === 'BUILD-001') && (f.status === 'NOT_RUN' || f.status === 'MANUAL_REVIEW'))
+  );
 
   for (const f of actionableFindings) {
     // 1. ENV-001: Missing .env.example template
@@ -322,7 +394,9 @@ export function generateRemediationPatches(projectDir, findings = [], files = []
             description: `Creates documented .env.example with ${envKeys.length} discovered keys using safe non-secret dummy values.`,
           });
         }
-      } catch {}
+      } catch {
+        /* Ignore finding with invalid/unsafe target path */
+      }
     }
 
     // 2. ENV-002: Secret files not excluded in .gitignore
@@ -358,11 +432,13 @@ export function generateRemediationPatches(projectDir, findings = [], files = []
               'Excludes .env, .env.* (while permitting !.env.example), *.key, and .envguard/ runtime dirs. Note: does not remove already-tracked secrets from Git history.',
           });
         }
-      } catch {}
+      } catch {
+        /* Ignore finding with invalid/unsafe target path */
+      }
     }
 
     // 3. BUILD-002 / BUILD-001: Missing test script in package.json
-    // CRITICAL: Must NEVER generate fake passing test scripts like 'echo "Tests passing" && exit 0'
+    // CRITICAL: Must NEVER generate fake passing test scripts or assume tests exist without test files
     if (f.id === 'BUILD-002' || (f.id === 'BUILD-001' && f.explanation?.includes('test'))) {
       try {
         const { normalizedRelPath, resolvedTarget } = resolveSafeFindingTarget(projectDir, f.targetPath, 'package.json');
@@ -383,7 +459,7 @@ export function generateRemediationPatches(projectDir, findings = [], files = []
           if (isMissingOrPlaceholder) {
             const discovery = discoverTestFramework(projectDir, pkg, files);
 
-            if (discovery.status === 'RECOMMENDED' && discovery.command) {
+            if (discovery.status === 'RECOMMENDED' && discovery.command && discovery.testFilesFound) {
               pkg.scripts.test = discovery.command;
               const proposed = JSON.stringify(pkg, null, 2) + '\n';
 
@@ -398,13 +474,16 @@ export function generateRemediationPatches(projectDir, findings = [], files = []
                 expectedOriginalHash,
                 proposedContent: proposed,
                 unifiedDiff: generateUnifiedDiff(normalizedRelPath, current, proposed),
-                description: `Configures verified "test" script using discovered ${discovery.framework} test runner.`,
+                description: `Configures verified "test" script using discovered ${discovery.framework} runner for ${discovery.testFilesCount} test file(s).`,
                 framework: discovery.framework,
+                testDiscovery: discovery,
               });
             }
           }
         }
-      } catch {}
+      } catch {
+        /* Ignore unreadable package.json or invalid target path */
+      }
     }
   }
 

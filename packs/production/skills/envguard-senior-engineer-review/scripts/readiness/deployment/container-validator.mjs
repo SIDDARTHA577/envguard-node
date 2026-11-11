@@ -55,7 +55,7 @@ export function validateContainerSetup(projectDir, files = []) {
   // 2. Validate Dockerfiles
   for (const relPath of dockerfiles) {
     const fullPath = path.join(projectDir, relPath);
-    let content = '';
+    let content;
     try {
       content = fs.readFileSync(fullPath, 'utf8');
     } catch {
@@ -213,7 +213,7 @@ export function validateContainerSetup(projectDir, files = []) {
   // 3. Validate Docker Compose Files
   for (const relPath of composeFiles) {
     const fullPath = path.join(projectDir, relPath);
-    let content = '';
+    let content;
     try {
       content = fs.readFileSync(fullPath, 'utf8');
     } catch {

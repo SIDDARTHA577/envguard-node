@@ -46,7 +46,7 @@ export function validateCicdDeploymentGates(projectDir, files = []) {
 
   for (const relPath of workflowFiles) {
     const fullPath = path.join(projectDir, relPath);
-    let content = '';
+    let content;
     try {
       content = fs.readFileSync(fullPath, 'utf8');
     } catch {

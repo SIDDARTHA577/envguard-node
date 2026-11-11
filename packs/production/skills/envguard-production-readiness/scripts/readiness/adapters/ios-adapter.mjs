@@ -76,7 +76,7 @@ export class IosAdapter extends BaseAdapter {
     ];
   }
 
-  getApplicableChecks(target, context) {
+  getApplicableChecks(_target, _context) {
     return [
       { id: 'IOS-DISC-001', name: 'Xcode Project or Swift Package Descriptor Present', category: 'discovery', required: true },
       { id: 'IOS-DISC-002', name: 'Target iOS Deployment Version Declared', category: 'discovery', required: true },
@@ -117,13 +117,6 @@ export class IosAdapter extends BaseAdapter {
         !f.includes('.build/') &&
         !f.includes('DerivedData/')
     );
-
-    let combinedInfoPlist = '';
-    for (const ip of infoPlistFiles) {
-      try {
-        combinedInfoPlist += '\n' + fs.readFileSync(path.join(projectDir, ip), 'utf8');
-      } catch {}
-    }
 
     // =========================================================================
     // IOS-DISC-001: Project Descriptor Present
@@ -186,7 +179,7 @@ export class IosAdapter extends BaseAdapter {
             deploymentEvidence = f;
             break;
           }
-        } catch {}
+        } catch { /* ignore non-critical read/parse error */ }
       }
     }
 
@@ -247,7 +240,7 @@ export class IosAdapter extends BaseAdapter {
           atsFindingFile = ip;
           break;
         }
-      } catch {}
+      } catch { /* ignore non-critical read/parse error */ }
     }
 
     if (arbitraryLoadsEnabled) {
@@ -323,7 +316,7 @@ export class IosAdapter extends BaseAdapter {
             break;
           }
         }
-      } catch {}
+      } catch { /* ignore non-critical read/parse error */ }
       if (rawUserDefaultsTokenLeakage) break;
     }
 
@@ -388,10 +381,6 @@ export class IosAdapter extends BaseAdapter {
     // IOS-SEC-003: Privacy Manifest & Usage Descriptions (MASVS-PRIVACY)
     // =========================================================================
     const hasPrivacyManifest = files.some((f) => f.endsWith('PrivacyInfo.xcprivacy'));
-    const hasUsageDescriptions =
-      combinedInfoPlist.includes('NSCameraUsageDescription') ||
-      combinedInfoPlist.includes('NSPhotoLibraryUsageDescription') ||
-      combinedInfoPlist.includes('NSLocationWhenInUseUsageDescription');
 
     if (hasPrivacyManifest) {
       findings.push(
@@ -478,7 +467,7 @@ export class IosAdapter extends BaseAdapter {
     return findings;
   }
 
-  runDynamicChecks(target, context, execRunner) {
+  runDynamicChecks(target, context, _execRunner) {
     const findings = [];
 
     // Native iOS compilation requires macOS with Xcode installed

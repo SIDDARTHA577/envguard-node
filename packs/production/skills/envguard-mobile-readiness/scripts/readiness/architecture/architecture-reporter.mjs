@@ -45,7 +45,7 @@ function createAdrForConcept(evalItem, inventory, requirements) {
 
   // Realistic, technically accurate rollback strategies tailored to concept type
   let rollbackStrategy;
-  let rollbackFeasibility = 'high';
+  let rollbackFeasibility;
 
   if (concept === 'partitioning_sharding' || concept === 'replication') {
     rollbackFeasibility = 'complex_requires_dba';
@@ -123,7 +123,7 @@ function createAdrForConcept(evalItem, inventory, requirements) {
 export function formatArchitectureMarkdown(architectureData) {
   if (!architectureData) return '';
 
-  const { inventory, requirements, evaluations, adrs, capacityModel } = architectureData;
+  const { inventory, evaluations, adrs, capacityModel } = architectureData;
 
   let md = `## 8. Senior System Architecture & Engineering Review\n\n`;
 

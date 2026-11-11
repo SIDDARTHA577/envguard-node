@@ -31,7 +31,7 @@ function parseWorkspaceGlobs(projectDir) {
           }
         }
       }
-    } catch {}
+    } catch { /* ignore non-critical read/parse error */ }
   }
 
   // Check root package.json workspaces
@@ -44,7 +44,7 @@ function parseWorkspaceGlobs(projectDir) {
       } else if (pkg.workspaces && Array.isArray(pkg.workspaces.packages)) {
         globs.push(...pkg.workspaces.packages);
       }
-    } catch {}
+    } catch { /* ignore non-critical read/parse error */ }
   }
 
   // Deduplicate globs
@@ -70,7 +70,7 @@ function resolveWorkspaceDirs(projectDir, globs) {
               resolved.push(rel);
             }
           }
-        } catch {}
+        } catch { /* ignore non-critical read/parse error */ }
       }
     } else {
       const directAbs = path.join(projectDir, glob);
@@ -142,7 +142,7 @@ function classifyApplication(appDir, relPath, manifest) {
   if (!hasIosProj) {
     try {
       hasIosProj = fs.readdirSync(appDir).some((f) => f.endsWith('.xcodeproj') || f.endsWith('.xcworkspace'));
-    } catch {}
+    } catch { /* ignore non-critical read/parse error */ }
   }
   if (hasIosProj && !hasReactNative && !frameworks.includes('flutter')) {
     if (!languages.includes('swift')) languages.push('swift');
@@ -169,7 +169,7 @@ function classifyApplication(appDir, relPath, manifest) {
   if (!hasJsFiles) {
     try {
       hasJsFiles = fs.readdirSync(appDir).some((f) => /\.(js|mjs|cjs|jsx|ts|tsx)$/i.test(f));
-    } catch {}
+    } catch { /* ignore non-critical read/parse error */ }
   }
   if (hasJsFiles) {
     languages.push('javascript');
@@ -182,7 +182,7 @@ function classifyApplication(appDir, relPath, manifest) {
   if (!hasPyFiles) {
     try {
       hasPyFiles = fs.readdirSync(appDir).some((f) => f.endsWith('.py'));
-    } catch {}
+    } catch { /* ignore non-critical read/parse error */ }
   }
   if (hasPyFiles) {
     languages.push('python');
@@ -192,7 +192,7 @@ function classifyApplication(appDir, relPath, manifest) {
       if (fs.existsSync(p)) {
         try {
           pyManifestContent += ' ' + fs.readFileSync(p, 'utf8').toLowerCase();
-        } catch {}
+        } catch { /* ignore non-critical read/parse error */ }
       }
     }
     if (fs.existsSync(path.join(appDir, 'manage.py')) || pyManifestContent.includes('django')) {
@@ -219,7 +219,7 @@ function classifyApplication(appDir, relPath, manifest) {
   if (!hasJavaFiles) {
     try {
       hasJavaFiles = fs.readdirSync(appDir).some((f) => f.endsWith('.java') || f.endsWith('.kt'));
-    } catch {}
+    } catch { /* ignore non-critical read/parse error */ }
   }
   if (hasJavaFiles) {
     languages.push('java');
@@ -229,7 +229,7 @@ function classifyApplication(appDir, relPath, manifest) {
       if (fs.existsSync(p)) {
         try {
           javaDescriptorContent += ' ' + fs.readFileSync(p, 'utf8').toLowerCase();
-        } catch {}
+        } catch { /* ignore non-critical read/parse error */ }
       }
     }
     if (javaDescriptorContent.includes('spring-boot') || javaDescriptorContent.includes('org.springframework.boot')) {
@@ -263,7 +263,7 @@ function classifyApplication(appDir, relPath, manifest) {
   }
 
   // Determine application type
-  let type = 'unknown';
+  let type;
   let confidence = 'verified';
   let uncertaintyReason = null;
 
@@ -382,7 +382,7 @@ export function buildInventoryGraph(projectDir) {
       isGit = true;
       gitCommit = res.stdout.trim();
     }
-  } catch {}
+  } catch { /* ignore non-critical read/parse error */ }
 
   // Check Monorepo signals
   const workspaceGlobs = parseWorkspaceGlobs(projectDir);
@@ -406,7 +406,7 @@ export function buildInventoryGraph(projectDir) {
       if (fs.existsSync(pkgPath)) {
         try {
           manifest = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
-        } catch {}
+        } catch { /* ignore non-critical read/parse error */ }
       }
 
       const classification = classifyApplication(appAbs, relPath, manifest);
@@ -449,7 +449,7 @@ export function buildInventoryGraph(projectDir) {
     if (fs.existsSync(pkgPath)) {
       try {
         manifest = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
-      } catch {}
+      } catch { /* ignore non-critical read/parse error */ }
     }
 
     const classification = classifyApplication(projectDir, '.', manifest);

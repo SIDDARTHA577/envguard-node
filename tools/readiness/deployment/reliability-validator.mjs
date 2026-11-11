@@ -49,7 +49,7 @@ export function validateOperationalReliability(projectDir, files = [], inventory
         shutdownFile = relPath;
         break;
       }
-    } catch {}
+    } catch { /* ignore non-critical read/parse error */ }
   }
 
   if (shutdownFound) {
@@ -104,7 +104,7 @@ export function validateOperationalReliability(projectDir, files = [], inventory
           break;
         }
       }
-    } catch {}
+    } catch { /* ignore non-critical read/parse error */ }
   }
 
   if (outboundCallFound) {
@@ -165,7 +165,7 @@ export function validateOperationalReliability(projectDir, files = [], inventory
           hasDownMigrations = true;
           break;
         }
-      } catch {}
+      } catch { /* ignore non-critical read/parse error */ }
     }
 
     if (hasDownMigrations) {
@@ -220,7 +220,7 @@ export function validateOperationalReliability(projectDir, files = [], inventory
           dlqFound = true;
           break;
         }
-      } catch {}
+      } catch { /* ignore non-critical read/parse error */ }
     }
 
     if (dlqFound) {

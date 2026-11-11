@@ -63,7 +63,7 @@ export class JavaSpringBootAdapter extends BaseAdapter {
         if (pomContent.includes('spring-boot')) {
           isSpringBoot = true;
         }
-      } catch {}
+      } catch { /* ignore non-critical read/parse error */ }
     } else if (hasBuildGradle) {
       buildTool = 'gradle';
       try {
@@ -74,7 +74,7 @@ export class JavaSpringBootAdapter extends BaseAdapter {
         if (gradleContent.includes('spring-boot') || gradleContent.includes('org.springframework.boot')) {
           isSpringBoot = true;
         }
-      } catch {}
+      } catch { /* ignore non-critical read/parse error */ }
     }
 
     // Also check for @SpringBootApplication annotation in Java source files
@@ -87,7 +87,7 @@ export class JavaSpringBootAdapter extends BaseAdapter {
               isSpringBoot = true;
               break;
             }
-          } catch {}
+          } catch { /* ignore non-critical read/parse error */ }
         }
       }
     }
@@ -119,7 +119,7 @@ export class JavaSpringBootAdapter extends BaseAdapter {
     ];
   }
 
-  getApplicableChecks(target, context) {
+  getApplicableChecks(_target, _context) {
     return [
       { id: 'JAVA-DISC-001', name: 'Java Build Tool & Descriptor Present', category: 'discovery', required: true },
       { id: 'JAVA-DISC-002', name: 'Explicit Java Version Target Declared', category: 'discovery', required: true },
@@ -220,7 +220,7 @@ export class JavaSpringBootAdapter extends BaseAdapter {
           declaredJavaVersion = match[1].trim();
           javaVersionEvidence = 'pom.xml';
         }
-      } catch {}
+      } catch { /* ignore non-critical read/parse error */ }
     }
 
     if (!declaredJavaVersion && hasGradle) {
@@ -237,7 +237,7 @@ export class JavaSpringBootAdapter extends BaseAdapter {
           declaredJavaVersion = match[1].trim();
           javaVersionEvidence = path.basename(gradlePath);
         }
-      } catch {}
+      } catch { /* ignore non-critical read/parse error */ }
     }
 
     if (declaredJavaVersion) {
@@ -341,7 +341,7 @@ export class JavaSpringBootAdapter extends BaseAdapter {
     for (const propFile of propertyFiles) {
       try {
         combinedProperties += '\n' + fs.readFileSync(path.join(projectDir, propFile), 'utf8');
-      } catch {}
+      } catch { /* ignore non-critical read/parse error */ }
     }
 
     // =========================================================================
@@ -366,7 +366,7 @@ export class JavaSpringBootAdapter extends BaseAdapter {
         ) {
           safeActuatorConfig = true;
         }
-      } catch {}
+      } catch { /* ignore non-critical read/parse error */ }
     }
 
     if (wildcardActuator) {
@@ -433,7 +433,7 @@ export class JavaSpringBootAdapter extends BaseAdapter {
       try {
         const pom = fs.readFileSync(path.join(targetDir, 'pom.xml'), 'utf8');
         if (pom.includes('spring-boot-starter-security')) hasSpringSecurity = true;
-      } catch {}
+      } catch { /* ignore non-critical read/parse error */ }
     } else if (hasGradle) {
       try {
         const gradlePath = fs.existsSync(path.join(targetDir, 'build.gradle.kts'))
@@ -441,7 +441,7 @@ export class JavaSpringBootAdapter extends BaseAdapter {
           : path.join(targetDir, 'build.gradle');
         const gradle = fs.readFileSync(gradlePath, 'utf8');
         if (gradle.includes('spring-boot-starter-security')) hasSpringSecurity = true;
-      } catch {}
+      } catch { /* ignore non-critical read/parse error */ }
     }
 
     for (const relFile of javaFiles) {
@@ -454,7 +454,7 @@ export class JavaSpringBootAdapter extends BaseAdapter {
             hasPermissiveAllFilter = true;
           }
         }
-      } catch {}
+      } catch { /* ignore non-critical read/parse error */ }
     }
 
     if (hasPermissiveAllFilter) {
@@ -533,7 +533,7 @@ export class JavaSpringBootAdapter extends BaseAdapter {
         ) {
           securePasswordEncoderConfigured = true;
         }
-      } catch {}
+      } catch { /* ignore non-critical read/parse error */ }
     }
 
     if (noOpPasswordEncoderFinding) {
@@ -593,7 +593,7 @@ export class JavaSpringBootAdapter extends BaseAdapter {
             break;
           }
         }
-      } catch {}
+      } catch { /* ignore non-critical read/parse error */ }
       if (hardcodedDatasourcePassword) break;
     }
 
@@ -661,7 +661,7 @@ export class JavaSpringBootAdapter extends BaseAdapter {
         ) {
           safeDdlAuto = true;
         }
-      } catch {}
+      } catch { /* ignore non-critical read/parse error */ }
     }
 
     if (dangerousDdlAuto) {
@@ -782,7 +782,7 @@ export class JavaSpringBootAdapter extends BaseAdapter {
             hasJpaQueries = true;
           }
         }
-      } catch {}
+      } catch { /* ignore non-critical read/parse error */ }
       if (rawSqlInjectionFinding) break;
     }
 

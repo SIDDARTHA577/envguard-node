@@ -12,7 +12,7 @@
  * Backup configuration does not prove verified restore capability."
  */
 
-export function analyzeFailureModes(inventory, requirements) {
+export function analyzeFailureModes(inventory, _requirements) {
   const failureModes = [];
   const infraComp = inventory.components.find((c) => c.type === 'infrastructure');
   const hasK8s = infraComp?.technologies?.includes('kubernetes');

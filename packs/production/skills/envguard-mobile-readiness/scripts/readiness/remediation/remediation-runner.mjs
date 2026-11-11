@@ -1,4 +1,3 @@
-import path from 'node:path';
 import { runReadinessAudit } from '../engine/orchestrator.mjs';
 import { compareReadinessReports } from '../reporters/comparator.mjs';
 import { collectProjectFiles } from '../constants.mjs';

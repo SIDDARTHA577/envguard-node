@@ -40,7 +40,7 @@ Based on Anthropic's published criteria for the **Claude for Open Source** progr
 * **Verified npm Downloads**: `0` (package has NOT been published to npm).
 * **Dependent Repositories**: `0` (verified via GitHub dependency network).
 * **External Contributors**: `0` (maintained by `SIDDARTHA577`).
-* **Completed Pull Requests on `main`**: 22 merged PRs (PR #1 through PR #27) across platform architecture, readiness testing, security heuristics, capacity modeling, agent orchestration, remediation workflows, deployment gates, and developer tooling.
+* **Completed Pull Requests on `main`**: 24 merged engineering PRs (`#1`, `#3`, `#5`–`#23`, `#27`–`#29`) across platform architecture, readiness testing, security hardening, capacity modeling, agent orchestration, remediation safety, deployment gates, and developer tooling (plus pending Phase 14.3+ PRs).
 * **Release Policy**: Public npm publication and Git release tags are strictly deferred until complete maintainer sign-off.
 * **Known Limitations**:
   * Single-maintainer project at current stage.
