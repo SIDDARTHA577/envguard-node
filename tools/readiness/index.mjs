@@ -9,4 +9,5 @@ export * from './architecture/index.mjs';
 export * from './capacity/benchmark-runner.mjs';
 export * from './remediation/index.mjs';
 export * from './deployment/index.mjs';
+export * from './orchestration/index.mjs';
 export * from './validation/index.mjs';

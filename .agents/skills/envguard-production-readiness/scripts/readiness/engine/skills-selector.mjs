@@ -26,20 +26,32 @@ export function selectSkillsForProject(inventory = {}, files = []) {
   const allDeps = new Set();
   const allDevDeps = new Set();
   const allAppTypes = new Set();
+  const allFrameworks = new Set();
+  const allDatabases = new Set();
+  const allLanguages = new Set();
 
   for (const app of applications) {
     if (app.type) allAppTypes.add(app.type);
-    const deps = app.dependencies || {};
-    const devDeps = app.devDependencies || {};
+    const deps = app.manifest?.dependencies || app.dependencies || {};
+    const devDeps = app.manifest?.devDependencies || app.devDependencies || {};
     for (const d of Object.keys(deps)) allDeps.add(d);
     for (const d of Object.keys(devDeps)) allDevDeps.add(d);
+    for (const fw of app.frameworks || []) allFrameworks.add(fw);
+    for (const db of app.databases || []) allDatabases.add(db);
+    for (const lang of app.languages || []) allLanguages.add(lang);
   }
 
   const hasMobile =
+    allAppTypes.has('mobile') ||
     allAppTypes.has('react-native') ||
     allAppTypes.has('flutter') ||
     allAppTypes.has('android') ||
     allAppTypes.has('ios') ||
+    allFrameworks.has('react-native') ||
+    allFrameworks.has('expo') ||
+    allFrameworks.has('flutter') ||
+    allFrameworks.has('android-native') ||
+    allFrameworks.has('ios-native') ||
     files.some(
       (f) =>
         f.startsWith('android/') ||
@@ -50,9 +62,22 @@ export function selectSkillsForProject(inventory = {}, files = []) {
     );
 
   const hasBackend =
+    allAppTypes.has('backend') ||
+    allAppTypes.has('fullstack') ||
+    allAppTypes.has('service') ||
     allAppTypes.has('node-typescript') ||
     allAppTypes.has('python') ||
     allAppTypes.has('java') ||
+    allLanguages.has('python') ||
+    allLanguages.has('java') ||
+    allFrameworks.has('express') ||
+    allFrameworks.has('fastify') ||
+    allFrameworks.has('nestjs') ||
+    allFrameworks.has('koa') ||
+    allFrameworks.has('django') ||
+    allFrameworks.has('fastapi') ||
+    allFrameworks.has('flask') ||
+    allFrameworks.has('spring-boot') ||
     allDeps.has('express') ||
     allDeps.has('fastify') ||
     allDeps.has('nestjs') ||
@@ -68,7 +93,12 @@ export function selectSkillsForProject(inventory = {}, files = []) {
     );
 
   const hasFrontend =
+    allAppTypes.has('frontend') ||
+    allAppTypes.has('fullstack') ||
     allAppTypes.has('nextjs-react') ||
+    allFrameworks.has('react') ||
+    allFrameworks.has('nextjs') ||
+    allFrameworks.has('vite') ||
     allDeps.has('react') ||
     allDeps.has('next') ||
     allDeps.has('vue') ||
@@ -77,6 +107,7 @@ export function selectSkillsForProject(inventory = {}, files = []) {
     files.some((f) => f.includes('pages/') || f.includes('components/') || f.endsWith('index.html'));
 
   const hasDatabase =
+    allDatabases.size > 0 ||
     allDeps.has('prisma') ||
     allDevDeps.has('prisma') ||
     allDeps.has('@prisma/client') ||
