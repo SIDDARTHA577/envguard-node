@@ -1,6 +1,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { generateUnifiedDiff } from './diff-viewer.mjs';
+import {
+  assertSafeProjectRelativePathDetails,
+  computeSha256,
+  lstatSafe,
+  safeReadFileBufferSync,
+} from './checkpoint-manager.mjs';
 
 /**
  * Discovers referenced environment variable keys from project source files.
@@ -17,8 +23,9 @@ export function discoverEnvVarNames(projectDir, files = []) {
 
   for (const relFile of candidateFiles) {
     try {
-      const fullPath = path.join(projectDir, relFile);
-      const content = fs.readFileSync(fullPath, 'utf8');
+      const { resolvedTarget } = assertSafeProjectRelativePathDetails(projectDir, relFile);
+      const { buffer } = safeReadFileBufferSync(resolvedTarget);
+      const content = buffer.toString('utf8');
 
       // JS / TS / Node regex
       const jsMatches = content.matchAll(/process\.env\.([A-Z0-9_]+)/g);
@@ -182,7 +189,92 @@ export function discoverTestFramework(projectDir, pkg = {}, files = []) {
 }
 
 /**
+ * Formulates an updated .gitignore body that excludes secret files and EnvGuard runtime dirs
+ * while explicitly permitting .env.example templates and preserving existing rules.
+ *
+ * @param {string|null} currentContent
+ * @param {boolean} hasNodeProject
+ * @returns {string} Updated .gitignore content
+ */
+export function buildSafeGitignoreContent(currentContent, hasNodeProject = false) {
+  const existingLines = (currentContent || '')
+    .split(/\r?\n/)
+    .map((line) => line.trim());
+
+  const rulesToEnsure = [
+    '.env',
+    '.env.*',
+    '!.env.example',
+    '*.key',
+    '.envguard/backups/',
+    '.envguard/checkpoints/',
+    '.envguard/reports/',
+    '.envguard/cache/',
+  ];
+
+  if (hasNodeProject) {
+    const hasNodeModules = existingLines.some((l) => l === 'node_modules' || l === 'node_modules/' || l === '/node_modules/');
+    if (!hasNodeModules) {
+      rulesToEnsure.push('node_modules/');
+    }
+  }
+
+  const missingRules = [];
+  const lastEnvGlobIdx = existingLines.lastIndexOf('.env.*');
+  const lastExampleNegIdx = existingLines.lastIndexOf('!.env.example');
+
+  for (const rule of rulesToEnsure) {
+    if (rule === '!.env.example') {
+      // Ensure negation rule exists AND comes after the last '.env.*' pattern
+      const willAppendEnvGlob = missingRules.includes('.env.*');
+      if (lastExampleNegIdx === -1 || lastEnvGlobIdx > lastExampleNegIdx || willAppendEnvGlob) {
+        missingRules.push('!.env.example');
+      }
+    } else if (!existingLines.includes(rule)) {
+      missingRules.push(rule);
+    }
+  }
+
+  if (missingRules.length === 0 && currentContent !== null) {
+    return currentContent;
+  }
+
+  const blockLines = [
+    '',
+    '# EnvGuard: Exclude sensitive environment secrets, credentials, and runtime artifacts',
+    '# Note: Adding rules to .gitignore does not remove already-tracked secrets from Git history.',
+    ...missingRules,
+    '',
+  ];
+
+  const rulesBlock = blockLines.join('\n');
+  if (currentContent !== null) {
+    return currentContent.trimEnd() + '\n' + rulesBlock;
+  }
+  return rulesBlock.trimStart();
+}
+
+/**
+ * Resolves safe target file path for a finding.
+ *
+ * @param {string} projectDir
+ * @param {string} targetPath
+ * @param {string} filename
+ * @returns {{ normalizedRelPath: string, resolvedTarget: string }}
+ */
+function resolveSafeFindingTarget(projectDir, targetPath, filename) {
+  const baseSubdir = (!targetPath || targetPath === '.') ? '' : targetPath;
+  const combined = baseSubdir ? path.posix.join(baseSubdir.replace(/\\/g, '/'), filename) : filename;
+  const details = assertSafeProjectRelativePathDetails(projectDir, combined);
+  return {
+    normalizedRelPath: details.normalizedRelPath,
+    resolvedTarget: details.resolvedTarget,
+  };
+}
+
+/**
  * Generates safe, reviewable remediation patches for actionable assessment findings.
+ * Captures baseline hashes on every patch to protect against concurrent edits.
  *
  * @param {string} projectDir - Target application directory
  * @param {Array<object>} findings - Assessment findings from runReadinessAudit()
@@ -191,6 +283,7 @@ export function discoverTestFramework(projectDir, pkg = {}, files = []) {
  */
 export function generateRemediationPatches(projectDir, findings = [], files = []) {
   const patches = [];
+  const hasNodeProject = files.some((f) => f === 'package.json' || f.endsWith('/package.json'));
 
   // Filter only actionable defect findings (FAIL or WARNING)
   const actionableFindings = findings.filter((f) => f.status === 'FAIL' || f.status === 'WARNING');
@@ -198,90 +291,86 @@ export function generateRemediationPatches(projectDir, findings = [], files = []
   for (const f of actionableFindings) {
     // 1. ENV-001: Missing .env.example template
     if (f.id === 'ENV-001') {
-      const targetRelPath = path.join(f.targetPath || '.', '.env.example');
-      const fullPath = path.join(projectDir, targetRelPath);
+      try {
+        const { normalizedRelPath, resolvedTarget } = resolveSafeFindingTarget(projectDir, f.targetPath, '.env.example');
 
-      if (!fs.existsSync(fullPath)) {
-        const envKeys = discoverEnvVarNames(projectDir, files);
-        let proposed = '# Generated by EnvGuard Remediation Engine\n';
-        for (const key of envKeys) {
-          if (key === 'PORT') proposed += 'PORT=3000\n';
-          else if (key === 'NODE_ENV') proposed += 'NODE_ENV=development\n';
-          else if (key.includes('URL') || key.includes('URI')) proposed += `${key}=postgres://localhost:5432/db_dev\n`;
-          else if (key.includes('KEY') || key.includes('SECRET') || key.includes('TOKEN')) {
-            proposed += `${key}=your_${key.toLowerCase()}_here\n`;
-          } else {
-            proposed += `${key}=example_value\n`;
+        if (!lstatSafe(resolvedTarget)) {
+          const envKeys = discoverEnvVarNames(projectDir, files);
+          let proposed = '# Generated by EnvGuard Remediation Engine\n';
+          for (const key of envKeys) {
+            if (key === 'PORT') proposed += 'PORT=3000\n';
+            else if (key === 'NODE_ENV') proposed += 'NODE_ENV=development\n';
+            else if (key.includes('URL') || key.includes('URI')) proposed += `${key}=postgres://localhost:5432/db_dev\n`;
+            else if (key.includes('KEY') || key.includes('SECRET') || key.includes('TOKEN')) {
+              proposed += `${key}=your_${key.toLowerCase()}_here\n`;
+            } else {
+              proposed += `${key}=example_value\n`;
+            }
           }
-        }
 
-        patches.push({
-          patchId: `PATCH-${f.id}-CREATE-TEMPLATE`,
-          findingId: f.id,
-          title: 'Generate Environment Variable Template (.env.example)',
-          targetFile: targetRelPath,
-          action: 'create',
-          currentContent: null,
-          proposedContent: proposed,
-          unifiedDiff: generateUnifiedDiff(targetRelPath, null, proposed),
-          description: `Creates documented .env.example with ${envKeys.length} discovered keys using safe non-secret dummy values.`,
-        });
-      }
+          patches.push({
+            patchId: `PATCH-${f.id}-CREATE-TEMPLATE`,
+            findingId: f.id,
+            title: 'Generate Environment Variable Template (.env.example)',
+            targetFile: normalizedRelPath,
+            action: 'create',
+            currentContent: null,
+            expectedExisted: false,
+            expectedOriginalHash: null,
+            proposedContent: proposed,
+            unifiedDiff: generateUnifiedDiff(normalizedRelPath, null, proposed),
+            description: `Creates documented .env.example with ${envKeys.length} discovered keys using safe non-secret dummy values.`,
+          });
+        }
+      } catch {}
     }
 
     // 2. ENV-002: Secret files not excluded in .gitignore
     if (f.id === 'ENV-002') {
-      const targetRelPath = path.join(f.targetPath || '.', '.gitignore');
-      const fullPath = path.join(projectDir, targetRelPath);
-
-      let current = null;
-      let exists = false;
       try {
-        if (fs.existsSync(fullPath)) {
-          current = fs.readFileSync(fullPath, 'utf8');
-          exists = true;
+        const { normalizedRelPath, resolvedTarget } = resolveSafeFindingTarget(projectDir, f.targetPath, '.gitignore');
+
+        let current = null;
+        let expectedOriginalHash = null;
+        const st = lstatSafe(resolvedTarget);
+        const exists = Boolean(st);
+
+        if (exists) {
+          const { buffer } = safeReadFileBufferSync(resolvedTarget);
+          current = buffer.toString('utf8');
+          expectedOriginalHash = computeSha256(buffer);
+        }
+
+        const proposed = buildSafeGitignoreContent(current, hasNodeProject);
+        if (proposed !== current) {
+          patches.push({
+            patchId: `PATCH-${f.id}-UPDATE-GITIGNORE`,
+            findingId: f.id,
+            title: 'Add Environment Secret Exclusions to .gitignore',
+            targetFile: normalizedRelPath,
+            action: exists ? 'modify' : 'create',
+            currentContent: current,
+            expectedExisted: exists,
+            expectedOriginalHash,
+            proposedContent: proposed,
+            unifiedDiff: generateUnifiedDiff(normalizedRelPath, current, proposed),
+            description:
+              'Excludes .env, .env.* (while permitting !.env.example), *.key, and .envguard/ runtime dirs. Note: does not remove already-tracked secrets from Git history.',
+          });
         }
       } catch {}
-
-      const rulesToAppend = [
-        '',
-        '# EnvGuard: Exclude sensitive environment secrets and credentials',
-        '.env',
-        '.env.*',
-        '*.key',
-        'node_modules',
-        '',
-      ].join('\n');
-
-      let proposed;
-      if (exists && current !== null) {
-        proposed = current.trimEnd() + '\n' + rulesToAppend;
-      } else {
-        proposed = rulesToAppend.trimStart();
-      }
-
-      patches.push({
-        patchId: `PATCH-${f.id}-UPDATE-GITIGNORE`,
-        findingId: f.id,
-        title: 'Add Environment Secret Exclusions to .gitignore',
-        targetFile: targetRelPath,
-        action: exists ? 'modify' : 'create',
-        currentContent: current,
-        proposedContent: proposed,
-        unifiedDiff: generateUnifiedDiff(targetRelPath, current, proposed),
-        description: 'Appends exclusion patterns for .env, .env.*, and *.key to prevent accidental credential commits.',
-      });
     }
 
     // 3. BUILD-002 / BUILD-001: Missing test script in package.json
     // CRITICAL: Must NEVER generate fake passing test scripts like 'echo "Tests passing" && exit 0'
     if (f.id === 'BUILD-002' || (f.id === 'BUILD-001' && f.explanation?.includes('test'))) {
-      const targetRelPath = path.join(f.targetPath || '.', 'package.json');
-      const fullPath = path.join(projectDir, targetRelPath);
+      try {
+        const { normalizedRelPath, resolvedTarget } = resolveSafeFindingTarget(projectDir, f.targetPath, 'package.json');
 
-      if (fs.existsSync(fullPath)) {
-        try {
-          const current = fs.readFileSync(fullPath, 'utf8');
+        if (lstatSafe(resolvedTarget)) {
+          const { buffer } = safeReadFileBufferSync(resolvedTarget);
+          const current = buffer.toString('utf8');
+          const expectedOriginalHash = computeSha256(buffer);
           const pkg = JSON.parse(current);
           pkg.scripts = pkg.scripts || {};
 
@@ -295,7 +384,6 @@ export function generateRemediationPatches(projectDir, findings = [], files = []
             const discovery = discoverTestFramework(projectDir, pkg, files);
 
             if (discovery.status === 'RECOMMENDED' && discovery.command) {
-              // Real verified test framework detected in dependencies
               pkg.scripts.test = discovery.command;
               const proposed = JSON.stringify(pkg, null, 2) + '\n';
 
@@ -303,19 +391,20 @@ export function generateRemediationPatches(projectDir, findings = [], files = []
                 patchId: `PATCH-${f.id}-ADD-VERIFIED-TEST-SCRIPT`,
                 findingId: f.id,
                 title: `Configure Verified Test Script (${discovery.framework}) in package.json`,
-                targetFile: targetRelPath,
+                targetFile: normalizedRelPath,
                 action: 'modify',
                 currentContent: current,
+                expectedExisted: true,
+                expectedOriginalHash,
                 proposedContent: proposed,
-                unifiedDiff: generateUnifiedDiff(targetRelPath, current, proposed),
+                unifiedDiff: generateUnifiedDiff(normalizedRelPath, current, proposed),
                 description: `Configures verified "test" script using discovered ${discovery.framework} test runner.`,
                 framework: discovery.framework,
               });
             }
-            // If discovery is NOT_RUN or MANUAL_REVIEW, no fake patch is generated.
           }
-        } catch {}
-      }
+        }
+      } catch {}
     }
   }
 
