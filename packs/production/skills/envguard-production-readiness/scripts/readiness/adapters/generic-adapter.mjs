@@ -59,54 +59,43 @@ export class GenericAdapter extends BaseAdapter {
     const files = context.files || [];
 
     // --- Check 1: ENV-002 (.gitignore Exclusions) ---
-    const gitignorePath = path.join(projectDir, '.gitignore');
-    const gitignoreExists = fs.existsSync(gitignorePath);
+    const rootGitignorePath = path.join(projectDir, '.gitignore');
+    const targetGitignorePath = path.join(targetDir, '.gitignore');
+    const gitignoreCandidates =
+      path.resolve(targetDir) !== path.resolve(projectDir)
+        ? [targetGitignorePath, rootGitignorePath]
+        : [rootGitignorePath];
+    const existingGitignorePaths = gitignoreCandidates.filter((p) => fs.existsSync(p));
     let gitignoreRules = [];
 
-    if (gitignoreExists) {
-      try {
-        const content = fs.readFileSync(gitignorePath, 'utf8');
-        gitignoreRules = parseGitignoreRules(content);
-        const hasEnvIgnored =
-          content.includes('.env') || gitignoreRules.some((r) => r.pattern.includes('.env'));
+    if (existingGitignorePaths.length > 0) {
+      let matchedEnvGitignoreRel = null;
+      let firstExistingRel = '.gitignore';
+      let readError = null;
+      let readErrorFile = '.gitignore';
 
-        if (hasEnvIgnored) {
-          findings.push(
-            this.createFinding({
-              id: 'ENV-002',
-              category: 'env',
-              status: 'PASS',
-              severity: 'info',
-              title: 'Secret Environment Files Excluded in .gitignore',
-              explanation: '.gitignore contains exclusion rules for .env files.',
-              evidence: { file: '.gitignore' },
-              checkMethod: 'static_analysis',
-              recommendation: 'Ensure all local secret files (.env, .env.local, *.key) remain gitignored.',
-              manualVerificationRequired: false,
-              confidence: 'verified_fact',
-              targetPath: target.path,
-            })
-          );
-        } else {
-          findings.push(
-            this.createFinding({
-              id: 'ENV-002',
-              category: 'env',
-              status: 'FAIL',
-              severity: 'critical',
-              title: 'Secret Files Not Excluded in .gitignore',
-              explanation: '.gitignore does not contain explicit rules to exclude ".env" or ".env.*" files.',
-              evidence: { file: '.gitignore' },
-              checkMethod: 'static_analysis',
-              recommendation:
-              'Add ".env", ".env.*", "!.env.example", and "*.key" to .gitignore to prevent accidental credential commits. Note: updating .gitignore does not remove already-tracked secrets from Git history.',
-              manualVerificationRequired: false,
-              confidence: 'verified_fact',
-              targetPath: target.path,
-            })
-          );
+      for (const candidatePath of existingGitignorePaths) {
+        const relFile = path.relative(projectDir, candidatePath).replace(/\\/g, '/') || '.gitignore';
+        if (firstExistingRel === '.gitignore') {
+          firstExistingRel = relFile;
         }
-      } catch (err) {
+        try {
+          const content = fs.readFileSync(candidatePath, 'utf8');
+          const parsedRules = parseGitignoreRules(content);
+          gitignoreRules = gitignoreRules.concat(parsedRules);
+          const hasEnvIgnored =
+            content.includes('.env') || parsedRules.some((r) => r.pattern.includes('.env'));
+          if (hasEnvIgnored && !matchedEnvGitignoreRel) {
+            matchedEnvGitignoreRel = relFile;
+          }
+        } catch (err) {
+          readError = err;
+          readErrorFile = relFile;
+          break;
+        }
+      }
+
+      if (readError) {
         findings.push(
           this.createFinding({
             id: 'ENV-002',
@@ -114,10 +103,51 @@ export class GenericAdapter extends BaseAdapter {
             status: 'ERROR',
             severity: 'critical',
             title: 'Error Reading .gitignore',
-            explanation: `Failed to inspect .gitignore: ${err.message}`,
-            evidence: { file: '.gitignore' },
+            explanation: `Failed to inspect ${readErrorFile}: ${readError.message}`,
+            evidence: { file: '.gitignore', ...(readErrorFile !== '.gitignore' ? { resolvedFile: readErrorFile } : {}) },
             checkMethod: 'static_analysis',
             recommendation: 'Verify file permissions for .gitignore.',
+            manualVerificationRequired: false,
+            confidence: 'verified_fact',
+            targetPath: target.path,
+          })
+        );
+      } else if (matchedEnvGitignoreRel) {
+        findings.push(
+          this.createFinding({
+            id: 'ENV-002',
+            category: 'env',
+            status: 'PASS',
+            severity: 'info',
+            title: 'Secret Environment Files Excluded in .gitignore',
+            explanation: `${matchedEnvGitignoreRel} contains exclusion rules for .env files.`,
+            evidence: {
+              file: '.gitignore',
+              ...(matchedEnvGitignoreRel !== '.gitignore' ? { resolvedFile: matchedEnvGitignoreRel } : {}),
+            },
+            checkMethod: 'static_analysis',
+            recommendation: 'Ensure all local secret files (.env, .env.local, *.key) remain gitignored.',
+            manualVerificationRequired: false,
+            confidence: 'verified_fact',
+            targetPath: target.path,
+          })
+        );
+      } else {
+        findings.push(
+          this.createFinding({
+            id: 'ENV-002',
+            category: 'env',
+            status: 'FAIL',
+            severity: 'critical',
+            title: 'Secret Files Not Excluded in .gitignore',
+            explanation: `${firstExistingRel} does not contain explicit rules to exclude ".env" or ".env.*" files.`,
+            evidence: {
+              file: '.gitignore',
+              ...(firstExistingRel !== '.gitignore' ? { resolvedFile: firstExistingRel } : {}),
+            },
+            checkMethod: 'static_analysis',
+            recommendation:
+              'Add ".env", ".env.*", "!.env.example", and "*.key" to .gitignore to prevent accidental credential commits. Note: updating .gitignore does not remove already-tracked secrets from Git history.',
             manualVerificationRequired: false,
             confidence: 'verified_fact',
             targetPath: target.path,
@@ -132,7 +162,7 @@ export class GenericAdapter extends BaseAdapter {
           status: 'FAIL',
           severity: 'critical',
           title: 'Missing .gitignore File',
-          explanation: 'No .gitignore file found in repository root. High risk of accidental secret commits.',
+          explanation: 'No .gitignore file found in repository or workspace root. High risk of accidental secret commits.',
           evidence: { file: '.gitignore' },
           checkMethod: 'static_analysis',
           recommendation: 'Create a .gitignore file and exclude .env, .env.local, node_modules, and sensitive files.',
