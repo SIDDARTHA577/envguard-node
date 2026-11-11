@@ -5,10 +5,10 @@ import { selectSkillsForProject } from './skills-selector.mjs';
  * Formulates a complete, executable assessment plan prior to execution.
  * Previews static and dynamic phases, validates trust boundaries, and sequences skills.
  *
- * @param {object} options
- * @param {string} options.projectDir
- * @param {object} options.inventory
- * @param {string[]} options.files
+ * @param {object} [options={}]
+ * @param {string} [options.projectDir]
+ * @param {object} [options.inventory]
+ * @param {string[]} [options.files=[]]
  * @param {boolean} [options.allowExec=false]
  * @param {boolean} [options.trustProject=false]
  * @param {boolean|null} [options.isIsolated=null]

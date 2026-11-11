@@ -321,7 +321,7 @@ export function atomicWriteWithinRootSync(canonicalBase, relFile, content, { mod
     if (process.platform !== 'win32') {
       try {
         fs.chmodSync(resolvedTarget, targetMode);
-      } catch {}
+      } catch { /* ignore non-critical error */ }
     }
 
     return computeSha256(contentBuffer);
@@ -329,11 +329,11 @@ export function atomicWriteWithinRootSync(canonicalBase, relFile, content, { mod
     if (fd !== undefined) {
       try {
         fs.closeSync(fd);
-      } catch {}
+      } catch { /* ignore non-critical error */ }
     }
     try {
       fs.rmSync(tmpPath, { force: true });
-    } catch {}
+    } catch { /* ignore non-critical error */ }
     throw err;
   }
 }
@@ -370,7 +370,7 @@ export function ensureSafeBackupsBaseDir(canonicalBase) {
     try {
       fs.chmodSync(envguardDir, 0o700);
       fs.chmodSync(backupsBase, 0o700);
-    } catch {}
+    } catch { /* ignore non-critical error */ }
   }
 
   return backupsBase;
@@ -525,7 +525,7 @@ export function createCheckpoint(projectDir, patches = []) {
         if (process.platform !== 'win32') {
           try {
             fs.chmodSync(backupFilePath, 0o600);
-          } catch {}
+          } catch { /* ignore non-critical error */ }
         }
 
         // Verify backup write integrity
@@ -578,7 +578,7 @@ export function createCheckpoint(projectDir, patches = []) {
     // Clean up failed partial backup directory cleanly
     try {
       fs.rmSync(backupDir, { recursive: true, force: true });
-    } catch {}
+    } catch { /* ignore non-critical error */ }
     throw err;
   }
 }
@@ -920,7 +920,7 @@ export function cleanupCheckpoints(projectDir, { maxAgeMs = 7 * 24 * 3600 * 1000
       let mtime = 0;
       try {
         mtime = fs.lstatSync(dirPath).mtimeMs;
-      } catch {}
+      } catch { /* ignore non-critical error */ }
       return { name: e.name, path: dirPath, mtime };
     })
     .sort((a, b) => b.mtime - a.mtime); // Newest first

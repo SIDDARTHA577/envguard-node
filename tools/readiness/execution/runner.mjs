@@ -28,7 +28,9 @@ export function detectContainerEnvironment() {
     if (fs.existsSync('/.dockerenv')) {
       return { detected: true, indicator: '/.dockerenv' };
     }
-  } catch {}
+  } catch {
+    /* ignore inaccessible host indicator */
+  }
   try {
     if (fs.existsSync('/proc/1/cgroup')) {
       const cgroup = fs.readFileSync('/proc/1/cgroup', 'utf8');
@@ -36,7 +38,9 @@ export function detectContainerEnvironment() {
         return { detected: true, indicator: '/proc/1/cgroup container label' };
       }
     }
-  } catch {}
+  } catch {
+    /* ignore inaccessible cgroup indicator */
+  }
   return { detected: false, indicator: null };
 }
 
@@ -326,7 +330,7 @@ export function runProjectCommand(
       durationMs,
       stdout,
       stderr,
-      timedOut: res.error?.code === 'ETIMEDOUT',
+      timedOut: (/** @type {any} */ (res.error))?.code === 'ETIMEDOUT',
       isolated: effectiveIsolated,
       trustMode,
       error: res.error ? res.error.message : null,

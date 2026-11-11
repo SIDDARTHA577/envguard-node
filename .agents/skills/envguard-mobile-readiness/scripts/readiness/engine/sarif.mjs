@@ -198,8 +198,8 @@ export function importSarifReport(sarifPath, context = {}) {
       const level = result.level || ruleDef.defaultConfiguration?.level || (rawKind ? undefined : 'warning');
       const kind = rawKind || (level === 'none' ? 'informational' : 'fail');
 
-      let status = 'INFORMATIONAL';
-      let severity = 'info';
+      let status;
+      let severity;
       let manualVerificationRequired = false;
       let confidence = 'verified_fact';
 

@@ -378,7 +378,6 @@ export function formatComparisonMarkdown(comparison) {
   const {
     projectIdentity,
     scopeCompatibility,
-    sourceRevision,
     before,
     after,
     statusTransition,
@@ -388,7 +387,6 @@ export function formatComparisonMarkdown(comparison) {
     newFindings,
     missingFindings,
     noLongerApplicableFindings,
-    notRunFindings,
   } = comparison;
 
   const sign = (n) => (n > 0 ? `+${n}` : `${n}`);

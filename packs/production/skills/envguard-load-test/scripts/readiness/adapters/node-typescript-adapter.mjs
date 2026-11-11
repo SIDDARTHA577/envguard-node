@@ -1,7 +1,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { BaseAdapter } from './base-adapter.mjs';
-import { TOOL_VERSION, sanitizeOutput, parseYamlFallback } from '../constants.mjs';
+import {
+  TOOL_VERSION,
+  TEST_VERIFICATION_STATES,
+  collectProjectFiles,
+  sanitizeOutput,
+  parseYamlFallback,
+} from '../constants.mjs';
+import { discoverTestFramework } from '../remediation/patch-generator.mjs';
 
 let YAMLParser = null;
 try {
@@ -82,7 +89,7 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
     ];
   }
 
-  getApplicableChecks(target, context) {
+  getApplicableChecks(target, _context) {
     const isLibrary = target.type === 'library';
     const checks = [
       { id: 'DISC-001', name: 'Valid Project Manifest Detected', category: 'discovery', required: true },
@@ -320,7 +327,7 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
             schemaFile = file;
             break;
           }
-        } catch {}
+        } catch { /* ignore non-critical read/parse error */ }
       }
     }
 
@@ -388,7 +395,7 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
               break;
             }
           }
-        } catch {}
+        } catch { /* ignore non-critical read/parse error */ }
       }
       if (sensitiveLoggingFile) break;
     }
@@ -570,7 +577,7 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
                 secureCookieDetected = true;
               }
             }
-          } catch {}
+          } catch { /* ignore non-critical read/parse error */ }
         }
         if (insecureCookieFinding) break;
       }
@@ -688,7 +695,7 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
           ) {
             hasStartupSecretValidation = true;
           }
-        } catch {}
+        } catch { /* ignore non-critical read/parse error */ }
       }
     }
 
@@ -746,7 +753,7 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
                 }
               }
             }
-          } catch {}
+          } catch { /* ignore non-critical read/parse error */ }
         }
         if (insecureAlgorithmFinding || hardcodedSecretFinding) break;
       }
@@ -886,7 +893,7 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
             isMultiTenantApp = true;
             break;
           }
-        } catch {}
+        } catch { /* ignore non-critical read/parse error */ }
       }
     }
 
@@ -930,7 +937,7 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
                 }
               }
             }
-          } catch {}
+          } catch { /* ignore non-critical read/parse error */ }
         }
         if (missingTenantFilterFinding) break;
       }
@@ -1090,7 +1097,7 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
                 break;
               }
             }
-          } catch {}
+          } catch { /* ignore non-critical read/parse error */ }
         }
         if (unprotectedAdminRoute) break;
       }
@@ -1414,7 +1421,7 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
                   break;
                 }
               }
-            } catch {}
+            } catch { /* ignore non-critical read/parse error */ }
           }
 
           if (detectedSourceRoutes > 0 || paths.length === 0) {
@@ -1505,7 +1512,7 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
                 break;
               }
             }
-          } catch {}
+          } catch { /* ignore non-critical read/parse error */ }
         }
         if (unboundedPaginationFinding) break;
       }
@@ -1571,7 +1578,7 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
               hasRateLimitCode = true;
               break;
             }
-          } catch {}
+          } catch { /* ignore non-critical read/parse error */ }
         }
       }
 
@@ -1636,7 +1643,7 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
             if (content.includes('idempotency-key') || content.includes('Idempotency') || content.includes('idempotent')) {
               hasIdempotencySupport = true;
             }
-          } catch {}
+          } catch { /* ignore non-critical read/parse error */ }
         }
       }
 
@@ -1867,7 +1874,7 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
                 };
               }
             }
-          } catch {}
+          } catch { /* ignore non-critical read/parse error */ }
         }
         if (rawSqlInjectionFinding) break;
       }
@@ -2006,7 +2013,7 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
             }
             if (unindexedFkFinding) break;
           }
-        } catch {}
+        } catch { /* ignore non-critical read/parse error */ }
       }
 
       if (unindexedFkFinding) {
@@ -2162,7 +2169,7 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
               healthFile = file;
               break;
             }
-          } catch {}
+          } catch { /* ignore non-critical read/parse error */ }
         }
       }
 
@@ -2212,7 +2219,7 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
               shutdownFile = file;
               break;
             }
-          } catch {}
+          } catch { /* ignore non-critical read/parse error */ }
         }
       }
 
@@ -2413,6 +2420,12 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
     const trustProject = context.trustProject ?? false;
     const allowedCommands = context.allowedCommands ?? null;
 
+    const projectFiles = Array.isArray(context.files) ? context.files : collectProjectFiles(targetDir);
+    const targetPrefix = target.path && target.path !== '.' ? `${target.path.replace(/\\/g, '/')}/` : '';
+    const scopedFiles = targetPrefix
+      ? projectFiles.filter((f) => f.startsWith(targetPrefix)).map((f) => f.slice(targetPrefix.length))
+      : projectFiles;
+
     const checkConfigs = [
       { id: 'BUILD-001', name: 'build', required: true },
       { id: 'BUILD-002', name: 'test', required: true },
@@ -2422,8 +2435,38 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
 
     for (const conf of checkConfigs) {
       const scriptKey = scripts[conf.name] ? conf.name : (conf.alias && scripts[conf.alias] ? conf.alias : null);
+      const testDiscovery = conf.name === 'test' ? discoverTestFramework(targetDir, pkg, scopedFiles) : null;
 
       if (!scriptKey) {
+        if (conf.name === 'test' && testDiscovery) {
+          const hasAmbiguousFiles = testDiscovery.testFilesFound || testDiscovery.frameworkDeclared;
+          findings.push(
+            this.createFinding({
+              id: conf.id,
+              category: 'build_test',
+              status: hasAmbiguousFiles ? 'MANUAL_REVIEW' : 'NOT_RUN',
+              severity: 'high',
+              title: hasAmbiguousFiles
+                ? 'Ambiguous Test Configuration: No "test" Script Declared'
+                : 'No "test" Script or Test Suite Configured',
+              explanation: `${testDiscovery.recommendation}`,
+              evidence: {
+                file: 'package.json',
+                verificationState: testDiscovery.verificationState,
+                testDiscovery,
+                testExecuted: false,
+                limitations: testDiscovery.limitations,
+              },
+              checkMethod: 'static_analysis',
+              recommendation: testDiscovery.recommendation,
+              manualVerificationRequired: true,
+              confidence: testDiscovery.confidence,
+              targetPath: target.path,
+            })
+          );
+          continue;
+        }
+
         findings.push(
           this.createFinding({
             id: conf.id,
@@ -2462,7 +2505,13 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
             severity: 'high',
             title: 'Placeholder or Fabricated Test Script Detected',
             explanation: `Declared test script ("${scriptVal}") does not execute automated tests. Fabricated or placeholder test commands do not verify application correctness.`,
-            evidence: { file: 'package.json', snippet: scriptVal },
+            evidence: {
+              file: 'package.json',
+              snippet: scriptVal,
+              verificationState: TEST_VERIFICATION_STATES.MANUAL_REVIEW,
+              testDiscovery,
+              testExecuted: false,
+            },
             checkMethod: 'static_analysis',
             recommendation: 'Replace placeholder test script with a real test runner (e.g. Vitest, Jest) executing real test files.',
             manualVerificationRequired: true,
@@ -2482,7 +2531,14 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
             severity: 'info',
             title: `Project Script "${conf.name}" Declared (Execution Not Run)`,
             explanation: `Found declared "${conf.name}" script ("${scriptVal}"). Execution skipped: read-only mode active (requires --allow-exec).`,
-            evidence: { file: 'package.json', snippet: scriptVal },
+            evidence: {
+              file: 'package.json',
+              snippet: scriptVal,
+              verificationState: TEST_VERIFICATION_STATES.NOT_RUN,
+              testExecuted: false,
+              testDiscovery: testDiscovery || undefined,
+              limitations: testDiscovery?.limitations,
+            },
             checkMethod: 'command_execution',
             recommendation: 'Authorize local command execution (--allow-exec) to verify build and test suites pass.',
             manualVerificationRequired: true,
@@ -2496,7 +2552,7 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
       // Execute authorized command with containment
       const execResult = execRunner(
         'npm',
-        ['run', conf.name],
+        ['run', scriptKey],
         targetDir,
         {
           timeoutMs,
@@ -2511,7 +2567,7 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
       if (context.executionAudit && Array.isArray(context.executionAudit)) {
         context.executionAudit.push({
           command: 'npm',
-          args: ['run', conf.name],
+          args: ['run', scriptKey],
           cwd: targetDir,
           timestamp: new Date().toISOString(),
           durationMs: execResult.durationMs,
@@ -2531,7 +2587,13 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
             severity: 'medium',
             title: `Execution of "${conf.name}" Blocked by Containment Policy`,
             explanation: execResult.stderr || 'Host execution blocked: unisolated host without explicit trust.',
-            evidence: { file: 'package.json', snippet: scriptVal },
+            evidence: {
+              file: 'package.json',
+              snippet: scriptVal,
+              verificationState: TEST_VERIFICATION_STATES.NOT_RUN,
+              testExecuted: false,
+              testDiscovery: testDiscovery || undefined,
+            },
             checkMethod: 'command_execution',
             recommendation: 'Provide container containment or explicitly acknowledge host trust (--trust-project).',
             manualVerificationRequired: true,
@@ -2547,8 +2609,14 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
             status: 'FAIL',
             severity: 'critical',
             title: `Script "${conf.name}" Timed Out (${timeoutMs}ms)`,
-            explanation: `Command "npm run ${conf.name}" exceeded execution timeout of ${timeoutMs}ms and was killed.`,
-            evidence: { command: `npm run ${conf.name}`, exitCode: execResult.exitCode, durationMs: execResult.durationMs },
+            explanation: `Command "npm run ${scriptKey}" exceeded execution timeout of ${timeoutMs}ms and was killed.`,
+            evidence: {
+              command: `npm run ${scriptKey}`,
+              exitCode: execResult.exitCode,
+              durationMs: execResult.durationMs,
+              verificationState: conf.name === 'test' ? TEST_VERIFICATION_STATES.TESTS_FAILED : undefined,
+              testExecuted: true,
+            },
             checkMethod: 'command_execution',
             recommendation: 'Investigate hanging operations, deadlock, or increase timeout via --timeout.',
             manualVerificationRequired: false,
@@ -2557,22 +2625,65 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
           })
         );
       } else if (execResult.success) {
-        findings.push(
-          this.createFinding({
-            id: conf.id,
-            category: 'build_test',
-            status: 'PASS',
-            severity: 'info',
-            title: `Script "${conf.name}" Passed (Exit Code 0)`,
-            explanation: `Command "npm run ${conf.name}" completed successfully in ${execResult.durationMs}ms.`,
-            evidence: { command: `npm run ${conf.name}`, exitCode: 0, durationMs: execResult.durationMs },
-            checkMethod: 'command_execution',
-            recommendation: 'Continue maintaining automated tests in CI pipelines.',
-            manualVerificationRequired: false,
-            confidence: 'verified_fact',
-            targetPath: target.path,
-          })
-        );
+        const combinedOutput = `${execResult.stdout || ''}\n${execResult.stderr || ''}`;
+        const zeroTestsExecuted =
+          conf.name === 'test' &&
+          /(?:no test files found|0 passing|collected 0 items|no tests? found)/i.test(combinedOutput);
+
+        if (zeroTestsExecuted) {
+          findings.push(
+            this.createFinding({
+              id: conf.id,
+              category: 'build_test',
+              status: 'MANUAL_REVIEW',
+              severity: 'high',
+              title: 'Test Runner Exited 0 Without Executing Tests',
+              explanation: `Command "npm run ${scriptKey}" exited with code 0, but output indicates zero tests actually executed.`,
+              evidence: {
+                command: `npm run ${scriptKey}`,
+                exitCode: 0,
+                durationMs: execResult.durationMs,
+                verificationState: TEST_VERIFICATION_STATES.MANUAL_REVIEW,
+                testExecuted: true,
+                testDiscovery,
+                snippet: sanitizeOutput(combinedOutput).slice(0, 300),
+              },
+              checkMethod: 'command_execution',
+              recommendation: 'Ensure the test suite discovers and executes meaningful test cases before relying on passing test status.',
+              manualVerificationRequired: true,
+              confidence: 'ambiguous',
+              targetPath: target.path,
+            })
+          );
+        } else {
+          findings.push(
+            this.createFinding({
+              id: conf.id,
+              category: 'build_test',
+              status: 'PASS',
+              severity: 'info',
+              title: `Script "${conf.name}" Passed (Exit Code 0)`,
+              explanation: `Command "npm run ${scriptKey}" completed successfully in ${execResult.durationMs}ms.`,
+              evidence: {
+                command: `npm run ${scriptKey}`,
+                exitCode: 0,
+                durationMs: execResult.durationMs,
+                verificationState: conf.name === 'test' ? TEST_VERIFICATION_STATES.TESTS_PASSED : undefined,
+                states:
+                  conf.name === 'test' && testDiscovery
+                    ? [...testDiscovery.states.filter((s) => s !== TEST_VERIFICATION_STATES.NOT_RUN), TEST_VERIFICATION_STATES.TEST_EXECUTED, TEST_VERIFICATION_STATES.TESTS_PASSED]
+                    : undefined,
+                testExecuted: true,
+                testDiscovery: testDiscovery || undefined,
+              },
+              checkMethod: 'command_execution',
+              recommendation: 'Continue maintaining automated tests in CI pipelines.',
+              manualVerificationRequired: false,
+              confidence: 'verified_fact',
+              targetPath: target.path,
+            })
+          );
+        }
       } else {
         findings.push(
           this.createFinding({
@@ -2581,11 +2692,13 @@ export class NodeTypeScriptAdapter extends BaseAdapter {
             status: 'FAIL',
             severity: 'critical',
             title: `Script "${conf.name}" Failed (Exit Code ${execResult.exitCode})`,
-            explanation: `Command "npm run ${conf.name}" exited with non-zero code ${execResult.exitCode} in ${execResult.durationMs}ms.`,
+            explanation: `Command "npm run ${scriptKey}" exited with non-zero code ${execResult.exitCode} in ${execResult.durationMs}ms.`,
             evidence: {
-              command: `npm run ${conf.name}`,
+              command: `npm run ${scriptKey}`,
               exitCode: execResult.exitCode,
               durationMs: execResult.durationMs,
+              verificationState: conf.name === 'test' ? TEST_VERIFICATION_STATES.TESTS_FAILED : undefined,
+              testExecuted: true,
               snippet: sanitizeOutput(execResult.stderr || execResult.stdout).slice(0, 300),
             },
             checkMethod: 'command_execution',

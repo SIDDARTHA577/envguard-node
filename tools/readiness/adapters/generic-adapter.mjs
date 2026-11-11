@@ -21,7 +21,7 @@ export class GenericAdapter extends BaseAdapter {
     });
   }
 
-  detect(target, context) {
+  detect(target, _context) {
     // Generic adapter applies to all repositories and root/workspace targets
     return {
       matched: true,
@@ -42,7 +42,7 @@ export class GenericAdapter extends BaseAdapter {
     ];
   }
 
-  getApplicableChecks(target, context) {
+  getApplicableChecks(_target, _context) {
     return [
       { id: 'ENV-002', name: 'Secret Files Excluded in .gitignore', category: 'env', required: true },
       { id: 'ENV-004', name: 'Committed Secret Detection', category: 'env', required: true },

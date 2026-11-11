@@ -87,7 +87,7 @@ export class AndroidAdapter extends BaseAdapter {
             isAndroidApp = true;
             break;
           }
-        } catch {}
+        } catch { /* ignore non-critical read/parse error */ }
       }
     }
 
@@ -128,7 +128,7 @@ export class AndroidAdapter extends BaseAdapter {
     ];
   }
 
-  getApplicableChecks(target, context) {
+  getApplicableChecks(_target, _context) {
     return [
       { id: 'ANDROID-DISC-001', name: 'Android Manifest & Build Configuration Present', category: 'discovery', required: true },
       { id: 'ANDROID-DISC-002', name: 'Explicit Compile & Target SDK Version Declared', category: 'discovery', required: true },
@@ -167,7 +167,7 @@ export class AndroidAdapter extends BaseAdapter {
         const content = fs.readFileSync(mp, 'utf8');
         combinedManifests += '\n' + content;
         primaryManifestRel = path.relative(projectDir, mp).replace(/\\/g, '/');
-      } catch {}
+      } catch { /* ignore non-critical read/parse error */ }
     }
 
     // Search Gradle files
@@ -182,7 +182,7 @@ export class AndroidAdapter extends BaseAdapter {
     for (const gf of gradleFiles) {
       try {
         combinedGradle += '\n' + fs.readFileSync(path.join(projectDir, gf), 'utf8');
-      } catch {}
+      } catch { /* ignore non-critical read/parse error */ }
     }
 
     // =========================================================================
@@ -228,13 +228,9 @@ export class AndroidAdapter extends BaseAdapter {
     // ANDROID-DISC-002: Compile & Target SDK Version
     // =========================================================================
     let targetSdk = null;
-    let compileSdk = null;
 
     const targetMatch = combinedGradle.match(/targetSdk(?:Version)?\s*[:=]?\s*([0-9]+)/);
     if (targetMatch) targetSdk = parseInt(targetMatch[1], 10);
-
-    const compileMatch = combinedGradle.match(/compileSdk(?:Version)?\s*[:=]?\s*([0-9]+)/);
-    if (compileMatch) compileSdk = parseInt(compileMatch[1], 10);
 
     if (targetSdk && targetSdk >= 33) {
       findings.push(
@@ -440,7 +436,7 @@ export class AndroidAdapter extends BaseAdapter {
           rawPrefsTokenLeakage = true;
           break;
         }
-      } catch {}
+      } catch { /* ignore non-critical read/parse error */ }
     }
 
     if (rawPrefsTokenLeakage) {

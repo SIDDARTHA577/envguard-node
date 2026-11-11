@@ -45,7 +45,7 @@ export class ReactNativeAdapter extends BaseAdapter {
       try {
         const content = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
         return content.expo || content;
-      } catch {}
+      } catch { /* ignore non-critical read/parse error */ }
     }
     return null;
   }
@@ -111,7 +111,7 @@ export class ReactNativeAdapter extends BaseAdapter {
     ];
   }
 
-  getApplicableChecks(target, context) {
+  getApplicableChecks(_target, _context) {
     return [
       { id: 'RN-DISC-001', name: 'Mobile App Manifest & Configuration Configured', category: 'discovery', required: true },
       { id: 'RN-DISC-002', name: 'Platform Bundle Identifier & Package Name Declared', category: 'discovery', required: true },
@@ -255,7 +255,7 @@ export class ReactNativeAdapter extends BaseAdapter {
         const deps = { ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) };
         rnVersion = deps['react-native'];
         expoVersion = deps['expo'];
-      } catch {}
+      } catch { /* ignore non-critical read/parse error */ }
     }
 
     if (expoVersion || rnVersion) {
@@ -300,7 +300,7 @@ export class ReactNativeAdapter extends BaseAdapter {
             break;
           }
         }
-      } catch {}
+      } catch { /* ignore non-critical read/parse error */ }
       if (leakedSecretFinding) break;
     }
 
@@ -373,7 +373,7 @@ export class ReactNativeAdapter extends BaseAdapter {
             break;
           }
         }
-      } catch {}
+      } catch { /* ignore non-critical read/parse error */ }
       if (rawAsyncStorageTokenUsage) break;
     }
 
@@ -451,7 +451,7 @@ export class ReactNativeAdapter extends BaseAdapter {
           deepLinkHandler = true;
           break;
         }
-      } catch {}
+      } catch { /* ignore non-critical read/parse error */ }
     }
 
     if (hasCustomScheme || deepLinkHandler) {
@@ -495,7 +495,7 @@ export class ReactNativeAdapter extends BaseAdapter {
             break;
           }
         }
-      } catch {}
+      } catch { /* ignore non-critical read/parse error */ }
     }
 
     if (insecureWebView) {
@@ -557,7 +557,7 @@ export class ReactNativeAdapter extends BaseAdapter {
             break;
           }
         }
-      } catch {}
+      } catch { /* ignore non-critical read/parse error */ }
       if (sensitiveLogging) break;
     }
 
@@ -616,7 +616,7 @@ export class ReactNativeAdapter extends BaseAdapter {
           hasErrorBoundary = true;
           break;
         }
-      } catch {}
+      } catch { /* ignore non-critical read/parse error */ }
     }
 
     if (hasErrorBoundary) {
@@ -773,7 +773,7 @@ export class ReactNativeAdapter extends BaseAdapter {
     const pkgPath = path.join(targetDir, 'package.json');
     if (!fs.existsSync(pkgPath)) return findings;
 
-    let scripts = {};
+    let scripts;
     try {
       const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
       scripts = pkg.scripts || {};

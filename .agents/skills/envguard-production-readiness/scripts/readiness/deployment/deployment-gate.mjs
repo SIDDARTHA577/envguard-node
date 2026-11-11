@@ -27,8 +27,8 @@ export const DEPLOYMENT_EXECUTION_GUARD = {
  * Evaluates full deployment readiness across container configuration, Kubernetes manifests,
  * CI/CD pipelines, and operational reliability findings.
  *
- * @param {object} params
- * @param {object[]} params.deploymentFindings - Findings from container, k8s, cicd, and reliability validators
+ * @param {object} [params={}]
+ * @param {object[]} [params.deploymentFindings=[]] - Findings from container, k8s, cicd, and reliability validators
  * @param {object[]} [params.policyFindings=[]] - Overall findings from readiness audit
  * @param {object} [params.options={}] - Optional evaluation options
  * @returns {object} Comprehensive deployment gate verdict with blockers and prerequisites
@@ -36,7 +36,7 @@ export const DEPLOYMENT_EXECUTION_GUARD = {
 export function evaluateDeploymentGate({
   deploymentFindings = [],
   policyFindings = [],
-  options = {},
+  options: _options = {},
 } = {}) {
   const allFindings = [...deploymentFindings, ...policyFindings];
 
@@ -101,7 +101,7 @@ export function evaluateDeploymentGate({
 
   // Determine gate verdict
   let verdict;
-  let deployable = false;
+  let deployable;
 
   if (blockers.length > 0 || missingPrerequisites.length > 0) {
     verdict = DEPLOYMENT_GATE_VERDICTS.BLOCKED;

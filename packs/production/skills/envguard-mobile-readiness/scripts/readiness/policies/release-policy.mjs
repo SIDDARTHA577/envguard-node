@@ -40,7 +40,6 @@ export function checkWaiver(finding, waivers = [], now = new Date()) {
   for (const w of waivers) {
     if (!w || !w.checkId) continue;
     if (w.checkId === finding.id || w.checkId === `${finding.id}::${finding.targetPath || '.'}`) {
-      // Check expiration
       if (w.expiresAt) {
         const expDate = new Date(w.expiresAt);
         if (!isNaN(expDate.getTime()) && expDate.getTime() <= now.getTime()) {
@@ -56,16 +55,19 @@ export function checkWaiver(finding, waivers = [], now = new Date()) {
 
 /**
  * Evaluates assessment findings and determines policy outcome based on explicit,
- * auditable release gates. Never calculates misleading arithmetic percentage scores.
+ * auditable release gates. Never calculates misleading arithmetic percentage scores,
+ * and never promotes scanner ERROR, incomplete coverage, or unexecuted tests to READY_FOR_REVIEW.
  *
  * @param {Array<object>} findings
- * @param {object} summary
+ * @param {object} [summary={}]
  * @param {object} [context={}]
  * @param {string[]} [context.mandatoryChecks]
  * @param {string[]} [context.blockingSeverities]
  * @param {boolean} [context.requireDynamicVerification=false]
  * @param {Array<object>} [context.waivers]
  * @param {boolean} [context.allowExec=false]
+ * @param {boolean} [context.incompleteCoverage=false]
+ * @param {boolean} [context.verifyMandatoryCheckPresence=false]
  * @returns {{ outcome: string, reasons: string[], gates: object, blockerCount: number, warningCount: number, waiverRecords: Array<object> }}
  */
 export function evaluateReleasePolicy(findings = [], summary = {}, context = {}) {
@@ -75,18 +77,27 @@ export function evaluateReleasePolicy(findings = [], summary = {}, context = {})
   const now = new Date();
 
   const mandatoryChecks = new Set(context.mandatoryChecks || DEFAULT_MANDATORY_CHECKS);
+  const hasExplicitMandatory = Array.isArray(context.mandatoryChecks) && context.mandatoryChecks.length > 0;
   const blockingSeverities = new Set(context.blockingSeverities || DEFAULT_BLOCKING_SEVERITIES);
   const blockingCategories = new Set(DEFAULT_BLOCKING_CATEGORIES);
   const requireDynamicVerification = Boolean(context.requireDynamicVerification);
   const allowExec = Boolean(context.allowExec);
+  const incompleteCoverage = Boolean(context.incompleteCoverage);
   const waivers = Array.isArray(context.waivers) ? context.waivers : [];
 
-  // Track security failures
   let securityFailures = 0;
   let mandatoryFailures = 0;
+  let scannerErrors = 0;
 
-  // 1. Evaluate Findings
+  // 1. Evaluate FAIL and ERROR Findings
   for (const f of findings) {
+    if (f.status === 'ERROR') {
+      scannerErrors++;
+      blockers.push(f);
+      reasons.push(`[${f.id}] ${f.title || 'Check Execution Error'} (SCANNER ERROR): ${f.explanation || 'Tool or adapter failed during check execution.'}`);
+      continue;
+    }
+
     if (f.status === 'FAIL') {
       const { waived, waiver, isExpired } = checkWaiver(f, waivers, now);
 
@@ -117,11 +128,6 @@ export function evaluateReleasePolicy(findings = [], summary = {}, context = {})
         });
       }
 
-      // Check if this failure is blocking:
-      // A failure blocks if:
-      // a) It has a blocking severity (critical, high)
-      // b) It is in a blocking category (security, build_test) even if medium severity
-      // c) It is in the mandatoryChecks list
       const isBlockingSeverity = blockingSeverities.has(f.severity);
       const isBlockingCategory = blockingCategories.has(f.category);
       const isMandatoryCheck = mandatoryChecks.has(f.id);
@@ -150,9 +156,16 @@ export function evaluateReleasePolicy(findings = [], summary = {}, context = {})
     }
   }
 
-  // 2. Check Mandatory Checks that might be NOT_RUN
+  // 2. Check Mandatory Checks that are NOT_RUN (or missing when caller specifies explicit mandatory list)
   for (const checkId of mandatoryChecks) {
     const matchingFindings = findings.filter((f) => f.id === checkId);
+    if (matchingFindings.length === 0 && hasExplicitMandatory && context.verifyMandatoryCheckPresence) {
+      mandatoryFailures++;
+      blockers.push({ id: checkId, status: 'NOT_RUN', title: `Missing Mandatory Check (${checkId})` });
+      reasons.push(`[${checkId}] Mandatory check "${checkId}" did not run or produced no evidence in report.`);
+      continue;
+    }
+
     for (const f of matchingFindings) {
       if (f.status === 'NOT_RUN') {
         blockers.push(f);
@@ -162,7 +175,7 @@ export function evaluateReleasePolicy(findings = [], summary = {}, context = {})
     }
   }
 
-  // If blockers exist -> BLOCKED
+  // If blockers or scanner errors exist -> BLOCKED
   if (blockers.length > 0) {
     return {
       outcome: POLICY_OUTCOMES.BLOCKED,
@@ -170,9 +183,11 @@ export function evaluateReleasePolicy(findings = [], summary = {}, context = {})
       gates: {
         zeroBlockers: false,
         zeroSecurityFailures: securityFailures === 0,
+        zeroScannerErrors: scannerErrors === 0,
         mandatoryChecksPassed: mandatoryFailures === 0,
-        testExecutionComplete: summary.fail === 0 && (!requireDynamicVerification || allowExec),
+        testExecutionComplete: (summary.fail ?? 0) === 0 && scannerErrors === 0 && (!requireDynamicVerification || allowExec),
         manualReviewsIdentified: (summary.manualReview ?? 0) > 0,
+        completeCoverage: !incompleteCoverage,
       },
       blockerCount: blockers.length,
       warningCount: summary.warning ?? 0,
@@ -180,24 +195,35 @@ export function evaluateReleasePolicy(findings = [], summary = {}, context = {})
     };
   }
 
-  // 3. Check for Incomplete Assessment (Critical dynamic checks NOT_RUN without authorization)
+  // 3. Check for Incomplete Assessment (Critical dynamic checks NOT_RUN or incomplete project coverage)
   const dynamicChecksNotRun = findings.filter(
     (f) => f.status === 'NOT_RUN' && (f.id.startsWith('BUILD-') || f.id === 'API-006')
   );
 
-  if ((dynamicChecksNotRun.length > 0 || requireDynamicVerification) && !allowExec) {
-    reasons.push(
-      'Assessment ran in read-only mode without script execution authorization (--allow-exec). Dynamic build and test execution results could not be verified.'
-    );
+  if (incompleteCoverage || dynamicChecksNotRun.length > 0 || (requireDynamicVerification && !allowExec)) {
+    if (incompleteCoverage) {
+      reasons.push(
+        'Project coverage was incomplete (e.g. empty directory, unrecognized stack, or scanner error). Cannot grant readiness approval.'
+      );
+    }
+    if (dynamicChecksNotRun.length > 0 || (requireDynamicVerification && !allowExec)) {
+      reasons.push(
+        !allowExec
+          ? 'Assessment ran in read-only mode without script execution authorization (--allow-exec). Dynamic build and test execution results could not be verified.'
+          : 'One or more build/test verification checks were NOT_RUN (e.g. blocked by containment policy or missing test suite).'
+      );
+    }
     return {
       outcome: POLICY_OUTCOMES.INCOMPLETE_ASSESSMENT,
       reasons,
       gates: {
         zeroBlockers: true,
         zeroSecurityFailures: true,
+        zeroScannerErrors: true,
         mandatoryChecksPassed: true,
-        testExecutionComplete: false,
+        testExecutionComplete: dynamicChecksNotRun.length === 0 && (!requireDynamicVerification || allowExec),
         manualReviewsIdentified: (summary.manualReview ?? 0) > 0,
+        completeCoverage: !incompleteCoverage,
       },
       blockerCount: 0,
       warningCount: summary.warning ?? 0,
@@ -217,9 +243,11 @@ export function evaluateReleasePolicy(findings = [], summary = {}, context = {})
       gates: {
         zeroBlockers: true,
         zeroSecurityFailures: true,
+        zeroScannerErrors: true,
         mandatoryChecksPassed: true,
         testExecutionComplete: true,
         manualReviewsIdentified: true,
+        completeCoverage: true,
       },
       blockerCount: 0,
       warningCount: summary.warning ?? 0,
@@ -235,9 +263,11 @@ export function evaluateReleasePolicy(findings = [], summary = {}, context = {})
     gates: {
       zeroBlockers: true,
       zeroSecurityFailures: true,
+      zeroScannerErrors: true,
       mandatoryChecksPassed: true,
       testExecutionComplete: true,
       manualReviewsIdentified: false,
+      completeCoverage: true,
     },
     blockerCount: 0,
     warningCount: summary.warning ?? 0,

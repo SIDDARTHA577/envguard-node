@@ -115,7 +115,8 @@ describe('9.1 & 9.2: Readiness Report Comparator Accuracy & Same-Project Regress
       expect(comp.projectIdentity.projectMismatch).toBe(false);
       expect(comp.scopeCompatibility.scopeMismatch).toBe(false);
       expect(comp.statusTransition.from).toBe('BLOCKED');
-      expect(comp.statusTransition.to).toBe('READY FOR HUMAN RELEASE REVIEW');
+      // Because missing-env declares no test suite, follow-up reaches INCOMPLETE ASSESSMENT rather than falsely claiming full release readiness
+      expect(comp.statusTransition.to).toBe('INCOMPLETE ASSESSMENT');
       expect(comp.statusTransition.improved).toBe(true);
       expect(comp.statusTransition.regressed).toBe(false);
       expect(comp.statusTransition.verdict).toBe('IMPROVED');

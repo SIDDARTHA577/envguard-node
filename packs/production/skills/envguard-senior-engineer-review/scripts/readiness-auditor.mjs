@@ -14,6 +14,7 @@ import {
   EXIT_CODES,
   VALID_CATEGORIES,
   VALID_STATUSES,
+  TEST_VERIFICATION_STATES,
   VALID_FORMATS,
   IGNORED_DIRECTORIES,
   stripAnsi,
@@ -117,6 +118,7 @@ export {
   EXIT_CODES,
   VALID_CATEGORIES,
   VALID_STATUSES,
+  TEST_VERIFICATION_STATES,
   VALID_FORMATS,
   IGNORED_DIRECTORIES,
   stripAnsi,
@@ -534,7 +536,9 @@ Safety Boundaries:
     let pkg = null;
     try {
       pkg = JSON.parse(fs.readFileSync(path.join(safeProjectDir, 'package.json'), 'utf8'));
-    } catch {}
+    } catch {
+      /* ignore missing or malformed package.json during preview */
+    }
     const preview = previewExecutionCommands(safeProjectDir, pkg, timeoutMs, { allowExec, trustProject });
     console.log('\n=== EnvGuard Command Execution Preview ===');
     console.log(`Target Project: ${preview.projectDir}`);

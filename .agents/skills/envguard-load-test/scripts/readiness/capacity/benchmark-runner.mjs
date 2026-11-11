@@ -13,8 +13,8 @@ const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
  * Executes controlled performance baselines against authorized localhost endpoints with strict timeouts,
  * zero third-party dependencies, safe memory streaming caps, and non-fabricating metric calculations.
  *
- * @param {object} options
- * @param {string} options.targetUrl - HTTP/HTTPS URL to benchmark (defaults to loopback-only)
+ * @param {object} [options={}]
+ * @param {string} [options.targetUrl] - HTTP/HTTPS URL to benchmark (defaults to loopback-only)
  * @param {number} [options.durationMs=2000] - Benchmark test duration in ms (100 - 30,000)
  * @param {number} [options.concurrency=5] - Number of concurrent worker loops (1 - 50)
  * @param {number} [options.timeoutPerReqMs=2000] - Request socket timeout in ms (50 - 30,000)
@@ -59,7 +59,7 @@ export async function runLocalBenchmark({
   try {
     parsedUrl = new URL(targetUrl);
   } catch (err) {
-    throw new Error(`Invalid target URL "${targetUrl}": ${err.message}`);
+    throw new Error(`Invalid target URL "${targetUrl}": ${err.message}`, { cause: err });
   }
 
   // Protocol Validation

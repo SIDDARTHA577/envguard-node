@@ -9,10 +9,6 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const REPO_ROOT = path.resolve(__dirname, '..');
 
-const CATALOG_DIR = path.join(REPO_ROOT, 'catalog');
-const PACKS_PATH = path.join(CATALOG_DIR, 'packs.json');
-const SKILLS_PATH = path.join(CATALOG_DIR, 'skills.json');
-
 export const SUPPORTED_HOSTS = ['codex', 'antigravity', 'claude', 'claude-code', 'cursor'];
 
 export const REQUIRED_SECTIONS = [
@@ -71,7 +67,7 @@ export function parseFrontmatter(content) {
   try {
     parsed = YAML.parse(rawYaml);
   } catch (err) {
-    throw new Error(`YAML frontmatter syntax error: ${err.message}`);
+    throw new Error(`YAML frontmatter syntax error: ${err.message}`, { cause: err });
   }
 
   if (!parsed || typeof parsed !== 'object') {
@@ -124,7 +120,7 @@ export function validateMetadata(metadata, destDir) {
       try {
         assertSafeDestination(destDir, file.path);
       } catch (err) {
-        throw new Error(`Invalid metadata for skill "${skillName}": ${err.message}`);
+        throw new Error(`Invalid metadata for skill "${skillName}": ${err.message}`, { cause: err });
       }
 
       if (seenPaths.has(file.path)) {
@@ -526,6 +522,15 @@ export function verifySkills(repoRoot = REPO_ROOT) {
 
 /**
  * Installs skills into target destination with safety, idempotency, and rollback.
+ *
+ * @param {object} [options={}]
+ * @param {string} [options.skillName]
+ * @param {string} [options.packName]
+ * @param {string} [options.destDir='.']
+ * @param {string} [options.targetHost='codex']
+ * @param {boolean} [options.dryRun=false]
+ * @param {boolean} [options.force=false]
+ * @param {string} [options.repoRoot]
  */
 export function installSkills({
   skillName,
@@ -545,7 +550,7 @@ export function installSkills({
   const allSkills = loadSkills(repoRoot);
   const allPacks = loadPacks(repoRoot);
 
-  let targetSkills = [];
+  let targetSkills;
 
   if (skillName) {
     const found = allSkills.find((s) => s.name === skillName);
@@ -582,7 +587,9 @@ export function installSkills({
       validateMetadata(raw, safeDestRoot);
       metadata = raw;
     } catch (err) {
-      throw new Error(`Installation blocked: corrupted installation metadata in destination: ${err.message}`);
+      throw new Error(`Installation blocked: corrupted installation metadata in destination: ${err.message}`, {
+        cause: err,
+      });
     }
   }
 
@@ -722,9 +729,11 @@ export function installSkills({
       for (const created of createdFiles) {
         try {
           if (fs.existsSync(created)) fs.unlinkSync(created);
-        } catch {}
+        } catch {
+          /* ignore rollback cleanup error */
+        }
       }
-      throw new Error(`Installation failed and was rolled back: ${err.message}`);
+      throw new Error(`Installation failed and was rolled back: ${err.message}`, { cause: err });
     }
   }
 
@@ -734,6 +743,15 @@ export function installSkills({
 /**
  * Safely uninstalls managed skills from target destination.
  * Checks checksums to protect user-modified files unless explicitly forced.
+ *
+ * @param {object} [options={}]
+ * @param {string} [options.skillName]
+ * @param {string} [options.packName]
+ * @param {boolean} [options.all=false]
+ * @param {string} [options.destDir='.']
+ * @param {boolean} [options.dryRun=false]
+ * @param {boolean} [options.force=false]
+ * @param {string} [options.repoRoot]
  */
 export function uninstallSkills({
   skillName,
@@ -762,10 +780,9 @@ export function uninstallSkills({
     return { success: false, error: `Uninstallation aborted: invalid or corrupted metadata: ${err.message}` };
   }
 
-  const allSkills = loadSkills(repoRoot);
   const allPacks = loadPacks(repoRoot);
 
-  let toRemove = [];
+  let toRemove;
 
   if (all) {
     toRemove = Object.keys(metadata.skills || {});

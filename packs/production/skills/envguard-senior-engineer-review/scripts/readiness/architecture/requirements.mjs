@@ -107,7 +107,7 @@ export function validateRequirementsConfig(config) {
  * Loads project-level requirements configuration file safely from .envguard/requirements.json
  *
  * @param {string} projectDir - Project root directory
- * @returns {{ config: object | null, errors: string[], fileFound: boolean }}
+ * @returns {{ config: object | null, errors: string[], fileFound: boolean, filePath?: string }}
  */
 export function loadProjectRequirementsFile(projectDir) {
   const reqPath = path.join(projectDir, '.envguard', 'requirements.json');
@@ -200,7 +200,7 @@ export function discoverArchitectureRequirements(projectDir, explicitRequirement
         docContent += ' ' + content;
         if (!documentedEvidencePath) documentedEvidencePath = doc;
       }
-    } catch {}
+    } catch { /* ignore non-critical read/parse error */ }
   }
 
   // Load project-level .envguard/requirements.json if present
@@ -246,7 +246,7 @@ export function discoverArchitectureRequirements(projectDir, explicitRequirement
         const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
         if (pkg.description) pkgDesc = pkg.description;
       }
-    } catch {}
+    } catch { /* ignore non-critical read/parse error */ }
 
     if (pkgDesc) {
       productPurpose = trackProperty({
@@ -272,7 +272,7 @@ export function discoverArchitectureRequirements(projectDir, explicitRequirement
 
   // 2. Critical User Journeys
   const resolvedJourneys = resolveField('criticalUserJourneys', explicitRequirements.criticalUserJourneys, repoConfig.criticalUserJourneys);
-  let criticalUserJourneys = [];
+  let criticalUserJourneys;
   if (resolvedJourneys) {
     criticalUserJourneys = trackProperty({
       fieldName: 'criticalUserJourneys',

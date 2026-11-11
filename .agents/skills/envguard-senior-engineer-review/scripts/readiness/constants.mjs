@@ -36,6 +36,20 @@ export const VALID_STATUSES = [
   'ERROR',
 ];
 
+/**
+ * Granular verification states distinguishing dependency declaration from actual execution.
+ */
+export const TEST_VERIFICATION_STATES = {
+  FRAMEWORK_DECLARED: 'FRAMEWORK_DECLARED',
+  RUNNER_AVAILABLE: 'RUNNER_AVAILABLE',
+  TEST_FILES_FOUND: 'TEST_FILES_FOUND',
+  TEST_EXECUTED: 'TEST_EXECUTED',
+  TESTS_PASSED: 'TESTS_PASSED',
+  TESTS_FAILED: 'TESTS_FAILED',
+  NOT_RUN: 'NOT_RUN',
+  MANUAL_REVIEW: 'MANUAL_REVIEW',
+};
+
 export const VALID_FORMATS = ['json', 'markdown', 'both'];
 
 export const IGNORED_DIRECTORIES = new Set([
@@ -63,6 +77,7 @@ export const IGNORED_DIRECTORIES = new Set([
  */
 export function stripAnsi(str) {
   if (typeof str !== 'string') return '';
+  // eslint-disable-next-line no-control-regex
   return str.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
 }
 
@@ -78,7 +93,7 @@ export function sanitizeOutput(str) {
   cleaned = cleaned.replace(/(ghp_[A-Za-z0-9_]{20,})/gi, '[REDACTED_GH_TOKEN]');
   cleaned = cleaned.replace(/(sk_live_[A-Za-z0-9_]{16,})/gi, '[REDACTED_STRIPE_KEY]');
   cleaned = cleaned.replace(/(AKIA[0-9A-Z]{16})/gi, '[REDACTED_AWS_KEY]');
-  cleaned = cleaned.replace(/(xox[baprs]-[A-Za-z0-9\-]{10,})/gi, '[REDACTED_SLACK_TOKEN]');
+  cleaned = cleaned.replace(/(xox[baprs]-[A-Za-z0-9-]{10,})/gi, '[REDACTED_SLACK_TOKEN]');
   cleaned = cleaned.replace(/(postgres|postgresql|mysql|mongodb(?:\+srv)?):\/\/[^:\s@]+:[^@\s]+@/gi, '$1://[REDACTED_CREDS]@');
   // Redact generic key=value pairs, ignoring already redacted values
   cleaned = cleaned.replace(/((?:password|secret|token|api_key|auth)\s*[:=]\s*['"]?)(?!\[REDACTED)[^'"\s,]+/gi, '$1[REDACTED]');

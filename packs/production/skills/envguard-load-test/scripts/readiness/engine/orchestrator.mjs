@@ -27,7 +27,6 @@ import {
   buildCapacityModel,
   generateArchitectureDecisionRecords,
 } from '../architecture/index.mjs';
-import { selectSkillsForProject } from './skills-selector.mjs';
 import { formulateAssessmentPlan } from './planner.mjs';
 
 /**
@@ -69,6 +68,7 @@ export function runReadinessAudit({
   blockingSeverities = null,
   requireDynamicVerification = false,
   waivers = [],
+  registryOverride = null,
 } = {}) {
   const safeProjectDir = assertSafeProjectDir(projectDir);
 
@@ -99,10 +99,13 @@ export function runReadinessAudit({
     blockingSeverities,
     requireDynamicVerification,
     waivers,
+    selectedCategories: categories,
+    scannerCrashDetected: false,
+    incompleteCoverage: false,
   };
 
   // 2. Adapter Resolution & Check Execution
-  const registry = createDefaultRegistry();
+  const registry = registryOverride || createDefaultRegistry();
   const allFindings = [];
   const limitations = new Set([
     'Static analysis checks identify potential configuration anomalies and declared patterns; they do not certify absolute security or absence of runtime bugs.',
@@ -116,7 +119,7 @@ export function runReadinessAudit({
 
   for (const app of inventory.applications) {
     const resolvedAdapters = registry.resolveAdaptersForTarget(app, context);
-    app.detectedAdapters = resolvedAdapters.map((m) => m.adapter.id);
+    /** @type {any} */ (app).detectedAdapters = resolvedAdapters.map((m) => m.adapter.id);
 
     for (const match of resolvedAdapters) {
       const adapter = match.adapter;
@@ -126,26 +129,79 @@ export function runReadinessAudit({
         limitations.add(lim);
       }
 
-      // Run static checks
-      const staticFindings = adapter.runStaticChecks(app, context);
-      for (const finding of staticFindings) {
-        const key = `${finding.id}::${finding.targetPath || '.'}`;
-        if (!seenCheckKeys.has(key)) {
-          seenCheckKeys.add(key);
-          allFindings.push(finding);
+      // Run static checks with scanner crash protection
+      try {
+        const staticFindings = adapter.runStaticChecks(app, context) || [];
+        for (const finding of staticFindings) {
+          const key = `${finding.id}::${finding.targetPath || '.'}`;
+          if (!seenCheckKeys.has(key)) {
+            seenCheckKeys.add(key);
+            allFindings.push(finding);
+          }
         }
+      } catch (adapterErr) {
+        context.scannerCrashDetected = true;
+        context.incompleteCoverage = true;
+        limitations.add(`Adapter "${adapter.id}" encountered an unhandled error during static analysis.`);
+        allFindings.push({
+          id: `SCAN-ERR-${adapter.id.toUpperCase()}-STATIC`,
+          checkId: `SCAN-ERR-${adapter.id.toUpperCase()}-STATIC`,
+          toolName: `envguard-adapter-${adapter.id}`,
+          toolVersion: adapter.version || TOOL_VERSION,
+          adapterId: adapter.id,
+          category: 'security',
+          status: 'ERROR',
+          severity: 'critical',
+          title: `Scanner Crash in "${adapter.id}" Static Analysis`,
+          explanation: `Adapter "${adapter.id}" crashed during static checks: ${adapterErr instanceof Error ? adapterErr.message : String(adapterErr)}`,
+          evidence: { adapterId: adapter.id },
+          checkMethod: 'static_analysis',
+          recommendation: 'Inspect target project files causing the scanner exception and resolve before trusting coverage.',
+          manualVerificationRequired: true,
+          confidence: 'verified_fact',
+          targetPath: app.path || '.',
+        });
       }
 
-      // Run dynamic checks (build and test execution)
-      const dynamicFindings = adapter.runDynamicChecks(app, context, runProjectCommand);
-      for (const finding of dynamicFindings) {
-        const key = `${finding.id}::${finding.targetPath || '.'}`;
-        if (!seenCheckKeys.has(key)) {
-          seenCheckKeys.add(key);
-          allFindings.push(finding);
+      // Run dynamic checks (build and test execution) with scanner crash protection
+      try {
+        const dynamicFindings = adapter.runDynamicChecks(app, context, runProjectCommand) || [];
+        for (const finding of dynamicFindings) {
+          const key = `${finding.id}::${finding.targetPath || '.'}`;
+          if (!seenCheckKeys.has(key)) {
+            seenCheckKeys.add(key);
+            allFindings.push(finding);
+          }
         }
+      } catch (adapterErr) {
+        context.scannerCrashDetected = true;
+        context.incompleteCoverage = true;
+        limitations.add(`Adapter "${adapter.id}" encountered an unhandled error during dynamic checks.`);
+        allFindings.push({
+          id: `SCAN-ERR-${adapter.id.toUpperCase()}-DYNAMIC`,
+          checkId: `SCAN-ERR-${adapter.id.toUpperCase()}-DYNAMIC`,
+          toolName: `envguard-adapter-${adapter.id}`,
+          toolVersion: adapter.version || TOOL_VERSION,
+          adapterId: adapter.id,
+          category: 'build_test',
+          status: 'ERROR',
+          severity: 'critical',
+          title: `Scanner Crash in "${adapter.id}" Dynamic Verification`,
+          explanation: `Adapter "${adapter.id}" crashed during dynamic checks: ${adapterErr instanceof Error ? adapterErr.message : String(adapterErr)}`,
+          evidence: { adapterId: adapter.id },
+          checkMethod: 'command_execution',
+          recommendation: 'Inspect target build/test configuration causing the runner exception.',
+          manualVerificationRequired: true,
+          confidence: 'verified_fact',
+          targetPath: app.path || '.',
+        });
       }
     }
+  }
+
+  if (files.length === 0 || inventory.applications.length === 0) {
+    context.incompleteCoverage = true;
+    limitations.add('Project directory contained zero discoverable application source files.');
   }
 
   // 2b. Optional SARIF Report Import (SAST, dependency, or secret scanning results)
@@ -358,6 +414,7 @@ export function runReadinessAudit({
  * @param {string|null} [options.sarifPath=null] - SARIF report path
  * @param {string|null} [options.outputDir=null] - Output artifact directory
  * @param {string} [options.format='both'] - Output format
+ * @param {boolean} [options.includeArchitecture=true] - Include senior architecture assessment
  * @param {object} [options.architectureRequirements={}] - Architecture requirements
  * @param {string[]} [options.mandatoryChecks] - Mandatory check IDs
  * @param {string[]} [options.blockingSeverities] - Blocking severities
@@ -388,7 +445,9 @@ export function runOrchestratedPipeline(options = {}) {
     if (typeof options.onStateTransition === 'function') {
       try {
         options.onStateTransition(state, details);
-      } catch {}
+      } catch {
+        /* ignore transition observer errors */
+      }
     }
   };
 
@@ -421,7 +480,7 @@ export function runOrchestratedPipeline(options = {}) {
 
     // State 4: ASSESSING & State 5: ANALYZING_ARCHITECTURE
     recordTransition(WORKFLOW_STATES.ASSESSING, {
-      targetAdapters: inventory.applications.flatMap((a) => a.detectedAdapters || []),
+      targetAdapters: inventory.applications.flatMap((a) => (/** @type {any} */ (a)).detectedAdapters || []),
     });
 
     recordTransition(WORKFLOW_STATES.ANALYZING_ARCHITECTURE, {
@@ -476,7 +535,9 @@ export function runOrchestratedPipeline(options = {}) {
         }
         const sessionFile = path.join(safeOutDir, 'orchestration-session.json');
         fs.writeFileSync(sessionFile, JSON.stringify(finalSession, null, 2), 'utf8');
-      } catch {}
+      } catch {
+        /* ignore session artifact write failure if directory restricted */
+      }
     }
 
     return finalSession;
