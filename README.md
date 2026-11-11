@@ -435,6 +435,8 @@ Below is a sanitized excerpt from an automated EnvGuard readiness report generat
 - **Safe Dotenv Parser**: Pure JavaScript parser. Does not execute shell commands, backticks, or subshell substitutions.
 - **Prototype Pollution Defense**: Explicitly rejects `__proto__`, `constructor`, and `prototype` keys during schema ingestion and JSON loading.
 - **Strict No-Auto-Deploy Guard**: The deployment gate evaluates container security, Kubernetes probes, and CI/CD gates, but strictly enforces `autoDeployAllowed: false`. Autonomous agents cannot trigger production deployments.
+- **Checkpoint Containment & Concurrent-Edit Protection**: Remediation checkpoints enforce canonical project root containment, reject symlinks/junctions, verify SHA-256 backup/manifest integrity, omit raw secret contents from JSON manifests, and refuse to overwrite concurrent developer modifications.
+- **Git History & `.gitignore` Scope**: Updating `.gitignore` prevents untracked secrets from being staged in future commits, but does **not** untrack already-committed files or erase exposed secrets from Git history. Previously committed credentials must be rotated and removed from history separately.
 - **Zero Outbound Telemetry**: EnvGuard runs 100% locally with zero external network tracking, phone-home telemetry, or analytics.
 
 See [SECURITY.md](./SECURITY.md) for vulnerability disclosure procedures.
@@ -444,7 +446,7 @@ See [SECURITY.md](./SECURITY.md) for vulnerability disclosure procedures.
 ## M. Testing & Quality Assurance
 
 EnvGuard enforces rigorous quality assurance across multiple environments:
-- **Comprehensive Test Matrix**: 38 test suites containing 485 unit, integration, and platform adapter tests (100% passing as of November 2026).
+- **Comprehensive Test Matrix**: 39 test suites containing 499 unit, integration, and security regression tests (100% passing as of November 2026).
 - **Supported Runtimes**: Node.js `22.x`, `24.x`, and `26.x` tested on both **Ubuntu Linux** and **Windows Server** via GitHub Actions.
 - **Static Analysis & Security**: CodeQL static analysis workflow and ESLint with zero warnings or errors.
 - **Zero Runtime Dependencies**: Layer A Core maintains zero third-party dependencies (`dependencies: {}`).

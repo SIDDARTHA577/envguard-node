@@ -98,7 +98,8 @@ export class GenericAdapter extends BaseAdapter {
               explanation: '.gitignore does not contain explicit rules to exclude ".env" or ".env.*" files.',
               evidence: { file: '.gitignore' },
               checkMethod: 'static_analysis',
-              recommendation: 'Add ".env", ".env.*", and "*.key" to .gitignore to prevent accidental credential commits.',
+              recommendation:
+              'Add ".env", ".env.*", "!.env.example", and "*.key" to .gitignore to prevent accidental credential commits. Note: updating .gitignore does not remove already-tracked secrets from Git history.',
               manualVerificationRequired: false,
               confidence: 'verified_fact',
               targetPath: target.path,
@@ -184,7 +185,7 @@ export class GenericAdapter extends BaseAdapter {
               evidence: { file: envFile },
               checkMethod: 'static_analysis',
               recommendation:
-                'Remove live .env file from Git tracking immediately (git rm --cached) and rotate any exposed secrets.',
+                'Remove live .env file from Git tracking immediately (git rm --cached) and rotate any exposed secrets. Note: adding .gitignore rules alone does not remove tracked secrets from Git commit history.',
               manualVerificationRequired: false,
               confidence: 'verified_fact',
               targetPath: target.path,

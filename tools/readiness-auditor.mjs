@@ -88,12 +88,19 @@ import {
   generateUnifiedDiff,
   discoverEnvVarNames,
   discoverTestFramework,
+  buildSafeGitignoreContent,
   generateRemediationPatches,
   assertSafeProjectRelativePath,
+  resolveCanonicalProjectRoot,
+  computeManifestIntegrityHash,
+  inspectBackupPermissionSecurity,
   createCheckpoint,
+  finalizeCheckpointPostApply,
+  loadCheckpointManifest,
   restoreCheckpoint,
   cleanupCheckpoints,
   REMEDIATION_STATUSES,
+  detectPreApplyConflicts,
   executeRemediationWorkflow,
   validateContainerSetup,
   validateKubernetesManifests,
@@ -184,12 +191,19 @@ export {
   generateUnifiedDiff,
   discoverEnvVarNames,
   discoverTestFramework,
+  buildSafeGitignoreContent,
   generateRemediationPatches,
   assertSafeProjectRelativePath,
+  resolveCanonicalProjectRoot,
+  computeManifestIntegrityHash,
+  inspectBackupPermissionSecurity,
   createCheckpoint,
+  finalizeCheckpointPostApply,
+  loadCheckpointManifest,
   restoreCheckpoint,
   cleanupCheckpoints,
   REMEDIATION_STATUSES,
+  detectPreApplyConflicts,
   executeRemediationWorkflow,
   validateContainerSetup,
   validateKubernetesManifests,
@@ -626,11 +640,19 @@ Safety Boundaries:
     if (remResult.status === REMEDIATION_STATUSES.REMEDIATED_AND_VERIFIED) {
       console.log(`\nSuccessfully applied ${remResult.patches.length} remediation patches.`);
       console.log(`Rollback checkpoint created: ${remResult.checkpoint?.checkpointId}`);
+      if (remResult.checkpoint?.security?.permissionWarning) {
+        console.warn(`Security Notice: ${remResult.checkpoint.security.permissionWarning}`);
+      }
       console.log(`Retesting verdict: ${remResult.verdict}\n`);
       if (remResult.afterReport?.policyEvaluation?.outcome === 'BLOCKED') {
         return EXIT_CODES.POLICY_BLOCKERS;
       }
       return EXIT_CODES.SUCCESS_NO_BLOCKERS;
+    }
+
+    if (remResult.status === REMEDIATION_STATUSES.CONFLICT) {
+      console.error(`Remediation conflict: ${remResult.error}`);
+      return EXIT_CODES.POLICY_BLOCKERS;
     }
 
     if (remResult.status === REMEDIATION_STATUSES.FAILED) {
